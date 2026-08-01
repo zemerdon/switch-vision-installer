@@ -1,10 +1,10 @@
-# Switch Vision Installer v1.9.0
+# Switch Vision Installer v1.9.4
 
 Official Home Assistant App for installing and updating Switch Vision from the public Switch Vision release repository.
 
 The Installer has its own version line. The Installer version identifies this app; the installed and available Switch Vision versions are shown separately in the Web UI.
 
-## v1.9.0
+## v1.9.4
 
 - Repository-ready Home Assistant App packaging.
 - Direct installation after adding the official GitHub repository to the Home Assistant App Store.
@@ -12,6 +12,7 @@ The Installer has its own version line. The Installer version identifies this ap
 - Current multi-architecture Home Assistant base image and app labels.
 - Stable release stage.
 - Preserves dry-run validation, checksums, backups, restore, release detection, and custom assets.
+- Automatically applies and verifies versioned Switch Vision Discovery updates through Supervisor.
 
 ## Managed components
 
