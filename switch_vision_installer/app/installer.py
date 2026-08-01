@@ -15,7 +15,7 @@ import urllib.error
 import zipfile
 import re
 
-INSTALLER_VERSION = "1.9.0"
+INSTALLER_VERSION = "1.9.1"
 OPTIONS_PATH = Path(os.environ.get("SV_INSTALLER_OPTIONS", "/data/options.json"))
 STATE_PATH = Path(os.environ.get("SV_INSTALLER_STATE", "/data/state.json"))
 WORK_DIR = Path(os.environ.get("SV_INSTALLER_WORK", "/data/work"))
@@ -271,8 +271,8 @@ def install_supervisor_addon(kind: str) -> dict[str, Any]:
 
 def find_release_snmp2mqtt_dir(root: Path) -> Path | None:
     candidates = [
-        root / "addons" / "switch_vision_snmp2mqtt",
-        root / "addons" / "switch-vision-snmp2mqtt-addon",
+        root / "local_apps" / "switch_vision_snmp2mqtt",
+        root / "local_apps" / "switch-vision-snmp2mqtt-addon",
         root / "switch_vision_snmp2mqtt",
     ]
     return next((path for path in candidates if path.is_dir()), None)
@@ -747,7 +747,7 @@ def component_plan(root: Path) -> tuple[list[tuple[Path, Path, str]], list[str],
         build_frontend_stage(root, frontend_stage)
         mappings = [
             (root / "custom_components" / "switch_vision", COMPONENT_DIR, "Custom component"),
-            (root / "addons" / "switch_vision_discovery", DISCOVERY_DIR, "Discovery add-on"),
+            (root / "local_apps" / "switch_vision_discovery", DISCOVERY_DIR, "Discovery add-on"),
             (frontend_stage, FRONTEND_DIR, "Dashboard frontend and visual assets"),
         ]
         release_snmp2mqtt = find_release_snmp2mqtt_dir(root)
