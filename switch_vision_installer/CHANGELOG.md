@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.9.1
+
+- Updated Switch Vision release validation for the current `local_apps/` layout.
+- Updated Discovery package detection to use `local_apps/switch_vision_discovery`.
+- Updated SNMP2MQTT package detection to use `local_apps/switch_vision_snmp2mqtt`.
+- Removed downloaded-release assumptions that required the old `addons/` folder.
+- Updated the installer interface version fallback to v1.9.1.
+
 ## 1.9.0
 
 - Converts the Installer into a complete Home Assistant App repository package.
