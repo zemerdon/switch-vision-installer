@@ -16,7 +16,7 @@ import urllib.error
 import zipfile
 import re
 
-INSTALLER_VERSION = "1.9.3"
+INSTALLER_VERSION = "1.9.4"
 OPTIONS_PATH = Path(os.environ.get("SV_INSTALLER_OPTIONS", "/data/options.json"))
 STATE_PATH = Path(os.environ.get("SV_INSTALLER_STATE", "/data/state.json"))
 WORK_DIR = Path(os.environ.get("SV_INSTALLER_WORK", "/data/work"))
@@ -54,8 +54,23 @@ def supervisor_request(path: str, method: str = "GET", payload: dict[str, Any] |
             "Content-Type": "application/json",
         },
     )
-    with urllib.request.urlopen(request, timeout=30) as response:
-        return json.load(response)
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return json.load(response)
+    except urllib.error.HTTPError as exc:
+        try:
+            body = exc.read().decode("utf-8", errors="replace").strip()
+        except Exception:
+            body = ""
+        detail = ""
+        if body:
+            try:
+                parsed = json.loads(body)
+                detail = str(parsed.get("message") or parsed.get("error") or body)
+            except Exception:
+                detail = body
+        suffix = f": {detail}" if detail else ""
+        raise RuntimeError(f"Supervisor API {method} {path} failed with HTTP {exc.code}{suffix}") from exc
 
 def find_discovery_slug(include_store: bool = False) -> str:
     addon = _find_addon(
@@ -140,7 +155,7 @@ def refresh_local_app_metadata() -> None:
     raise RuntimeError("Unable to refresh Home Assistant app metadata: " + "; ".join(errors))
 
 
-def rebuild_discovery_after_update(expected_version: str, progress: Progress | None = None) -> dict[str, Any]:
+def update_discovery_after_install(expected_version: str, progress: Progress | None = None) -> dict[str, Any]:
     installed = _find_addon(
         lambda slug, name: (
             slug.endswith("switch_vision_discovery")
@@ -156,38 +171,50 @@ def rebuild_discovery_after_update(expected_version: str, progress: Progress | N
     if not slug:
         raise RuntimeError("Supervisor did not return a slug for Switch Vision Discovery.")
 
+    expected = normalise_version(expected_version)
     if progress:
         progress("Refreshing Discovery app metadata…", 84)
     refresh_local_app_metadata()
 
-    current = addon_info(slug)
+    deadline = time.monotonic() + 120
+    current: dict[str, Any] = {}
+    while time.monotonic() < deadline:
+        current = addon_info(slug)
+        current_version = normalise_version(current.get("version"))
+        latest_version = normalise_version(current.get("version_latest"))
+        update_available = bool(current.get("update_available"))
+        if current_version == expected:
+            break
+        if update_available or latest_version == expected:
+            break
+        time.sleep(2)
+
     current_version = normalise_version(current.get("version"))
-    expected = normalise_version(expected_version)
     if current_version == expected:
         if str(current.get("state") or "").lower() != "started":
             if progress:
-                progress("Starting Switch Vision Discovery…", 92)
+                progress("Starting Switch Vision Discovery…", 94)
             supervisor_request(f"/addons/{slug}/start", method="POST")
             current = wait_for_addon(slug, expected_version=expected, expected_state="started")
         return {"updated": False, "installed": True, "slug": slug, "version": expected, "state": current.get("state")}
 
-    if progress:
-        progress(f"Stopping Discovery v{current_version or 'unknown'}…", 86)
-    try:
-        supervisor_request(f"/addons/{slug}/stop", method="POST")
-    except urllib.error.HTTPError as exc:
-        if exc.code not in (400, 409):
-            raise
+    latest_version = normalise_version(current.get("version_latest"))
+    update_available = bool(current.get("update_available"))
+    if not update_available and latest_version != expected:
+        raise RuntimeError(
+            f"Supervisor did not offer the expected Discovery update: installed v{current_version or 'unknown'}, "
+            f"latest v{latest_version or 'unknown'}, expected v{expected}."
+        )
 
     if progress:
-        progress(f"Rebuilding Discovery v{expected}…", 88)
-    supervisor_request(f"/addons/{slug}/rebuild", method="POST", payload={"force": True})
-    wait_for_addon(slug, expected_version=expected, timeout=600)
+        progress(f"Updating Discovery to v{expected}…", 90)
+    supervisor_request(
+        f"/store/addons/{slug}/update",
+        method="POST",
+        payload={"backup": False, "background": False},
+    )
 
-    if progress:
-        progress("Starting updated Switch Vision Discovery…", 94)
-    supervisor_request(f"/addons/{slug}/start", method="POST")
-    final = wait_for_addon(slug, expected_version=expected, expected_state="started", timeout=300)
+    final = wait_for_addon(slug, expected_version=expected, expected_state="started", timeout=900)
     return {"updated": True, "installed": True, "slug": slug, "version": expected, "state": final.get("state")}
 
 def configured_switch_count(options: dict[str, Any] | None) -> int:
@@ -911,11 +938,11 @@ def install_release(root: Path, version: str, checksum: str, progress: Progress 
     if "Discovery add-on" in installed:
         expected_discovery_version = read_packaged_app_version(root / "local_apps" / "switch_vision_discovery")
         try:
-            discovery_runtime = rebuild_discovery_after_update(expected_discovery_version, progress)
+            discovery_runtime = update_discovery_after_install(expected_discovery_version, progress)
         except Exception as exc:
             raise RuntimeError(
-                "Switch Vision files were installed, but Discovery could not be rebuilt and verified automatically: "
-                f"{exc}. Open the Discovery app, rebuild it, and confirm it reports v{expected_discovery_version}."
+                "Switch Vision files were installed, but Discovery could not be updated and verified automatically: "
+                f"{exc}. Open the Discovery app, run its offered update, and confirm it reports v{expected_discovery_version}."
             ) from exc
         if discovery_runtime.get("installed") and normalise_version(discovery_runtime.get("version")) != expected_discovery_version:
             raise RuntimeError(

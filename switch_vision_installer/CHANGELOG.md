@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.9.4
+
+- Uses Home Assistant Supervisor's normal app update endpoint for versioned Discovery updates.
+- Refreshes local app metadata and waits for Supervisor to advertise the new Discovery version.
+- Updates Discovery automatically, waits for it to restart, and verifies the installed version.
+- Includes Supervisor error response details in installer failures.
+- Replaces the unsuccessful forced rebuild workflow introduced in v1.9.3.
+
 ## v1.9.3
 
 - Automatically refreshes local app metadata after installing new Discovery source files.
