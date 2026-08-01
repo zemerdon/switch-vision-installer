@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.9.3
+
+- Automatically refreshes local app metadata after installing new Discovery source files.
+- Stops, rebuilds, starts, and verifies Switch Vision Discovery when the bundled version changes.
+- Preserves Supervisor-managed Discovery options during the rebuild.
+- Refuses to report a fully successful update unless the installed Discovery version matches the release package.
+- Reduces post-update guidance to running Discovery when the automatic rebuild succeeds.
+
 ## v1.9.1
 
 - Updated Switch Vision release validation for the current `local_apps/` layout.
