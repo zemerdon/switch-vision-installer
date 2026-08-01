@@ -15,7 +15,7 @@ import urllib.error
 import zipfile
 import re
 
-INSTALLER_VERSION = "1.9.1"
+INSTALLER_VERSION = "1.9.2"
 OPTIONS_PATH = Path(os.environ.get("SV_INSTALLER_OPTIONS", "/data/options.json"))
 STATE_PATH = Path(os.environ.get("SV_INSTALLER_STATE", "/data/state.json"))
 WORK_DIR = Path(os.environ.get("SV_INSTALLER_WORK", "/data/work"))
@@ -454,7 +454,10 @@ def safe_extract(archive: Path, destination: Path) -> None:
 def find_release_root(extracted: Path) -> Path:
     candidates = [extracted, *(p for p in extracted.iterdir() if p.is_dir())]
     for candidate in candidates:
-        if (candidate / "custom_components" / "switch_vision").is_dir() and (candidate / "addons" / "switch_vision_discovery").is_dir():
+        if (
+            (candidate / "custom_components" / "switch_vision").is_dir()
+            and (candidate / "local_apps" / "switch_vision_discovery").is_dir()
+        ):
             return candidate
     raise RuntimeError("Release ZIP does not contain the expected Switch Vision folders.")
 
@@ -468,8 +471,8 @@ def backup_contents(path: Path) -> list[str]:
     entries = []
     if (path / "custom_components/switch_vision").is_dir(): entries.append("Custom component")
     if (path / "www/switch-vision").is_dir(): entries.append("Dashboard frontend")
-    if (path / "addons/switch_vision_discovery").is_dir(): entries.append("Discovery add-on")
-    if (path / "addons/switch_vision_snmp2mqtt").is_dir(): entries.append("SNMP2MQTT add-on")
+    if (path / "local_apps/switch_vision_discovery").is_dir(): entries.append("Discovery app")
+    if find_release_snmp2mqtt_dir(path) is not None: entries.append("SNMP2MQTT app")
     if (path / ".storage/switch_vision_calibrations").is_file(): entries.append("Calibration storage")
     if (path / "discovery-options.json").is_file(): entries.append("Discovery configuration")
     if (path / "snmp2mqtt-options.json").is_file(): entries.append("SNMP2MQTT configuration")
