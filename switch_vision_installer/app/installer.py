@@ -10,12 +10,13 @@ import json
 import os
 import shutil
 import tempfile
+import time
 import urllib.request
 import urllib.error
 import zipfile
 import re
 
-INSTALLER_VERSION = "1.9.2"
+INSTALLER_VERSION = "1.9.3"
 OPTIONS_PATH = Path(os.environ.get("SV_INSTALLER_OPTIONS", "/data/options.json"))
 STATE_PATH = Path(os.environ.get("SV_INSTALLER_STATE", "/data/state.json"))
 WORK_DIR = Path(os.environ.get("SV_INSTALLER_WORK", "/data/work"))
@@ -81,6 +82,113 @@ def get_discovery_options() -> dict[str, Any] | None:
 def set_discovery_options(options: dict[str, Any]) -> None:
     slug = find_discovery_slug()
     supervisor_request(f"/addons/{slug}/options", method="POST", payload={"options": options})
+
+
+
+def normalise_version(value: Any) -> str:
+    return str(value or "").strip().lstrip("v")
+
+
+def read_packaged_app_version(app_dir: Path) -> str:
+    config = app_dir / "config.yaml"
+    if not config.is_file():
+        raise RuntimeError(f"App package is missing {config}.")
+    match = re.search(r'^version:\s*["\']?([^"\'\s#]+)', config.read_text(encoding="utf-8"), re.MULTILINE)
+    if not match:
+        raise RuntimeError(f"Unable to read app version from {config}.")
+    return normalise_version(match.group(1))
+
+
+def addon_info(slug: str) -> dict[str, Any]:
+    payload = supervisor_request(f"/addons/{slug}/info")
+    data = payload.get("data", {})
+    if not isinstance(data, dict):
+        raise RuntimeError(f"Supervisor returned invalid app information for {slug}.")
+    return data
+
+
+def wait_for_addon(slug: str, *, expected_version: str | None = None, expected_state: str | None = None, timeout: int = 300) -> dict[str, Any]:
+    deadline = time.monotonic() + timeout
+    last: dict[str, Any] = {}
+    while time.monotonic() < deadline:
+        try:
+            last = addon_info(slug)
+            version_ok = expected_version is None or normalise_version(last.get("version")) == normalise_version(expected_version)
+            state_ok = expected_state is None or str(last.get("state") or "").lower() == expected_state.lower()
+            if version_ok and state_ok:
+                return last
+        except Exception:
+            pass
+        time.sleep(2)
+    details = []
+    if expected_version is not None:
+        details.append(f"version {normalise_version(expected_version)}")
+    if expected_state is not None:
+        details.append(f"state {expected_state}")
+    observed = f"last observed version={last.get('version')!r}, state={last.get('state')!r}" if last else "no app information was returned"
+    raise RuntimeError(f"Timed out waiting for {slug} to reach {' and '.join(details)} ({observed}).")
+
+
+def refresh_local_app_metadata() -> None:
+    errors: list[str] = []
+    for endpoint in ("/addons/reload", "/store/reload"):
+        try:
+            supervisor_request(endpoint, method="POST")
+            return
+        except Exception as exc:
+            errors.append(f"{endpoint}: {exc}")
+    raise RuntimeError("Unable to refresh Home Assistant app metadata: " + "; ".join(errors))
+
+
+def rebuild_discovery_after_update(expected_version: str, progress: Progress | None = None) -> dict[str, Any]:
+    installed = _find_addon(
+        lambda slug, name: (
+            slug.endswith("switch_vision_discovery")
+            or "switch-vision-discovery" in slug
+            or name == "switch vision discovery"
+        ),
+        include_store=False,
+    )
+    if not installed:
+        return {"updated": False, "installed": False, "expected_version": normalise_version(expected_version)}
+
+    slug = str(installed.get("slug") or "")
+    if not slug:
+        raise RuntimeError("Supervisor did not return a slug for Switch Vision Discovery.")
+
+    if progress:
+        progress("Refreshing Discovery app metadata…", 84)
+    refresh_local_app_metadata()
+
+    current = addon_info(slug)
+    current_version = normalise_version(current.get("version"))
+    expected = normalise_version(expected_version)
+    if current_version == expected:
+        if str(current.get("state") or "").lower() != "started":
+            if progress:
+                progress("Starting Switch Vision Discovery…", 92)
+            supervisor_request(f"/addons/{slug}/start", method="POST")
+            current = wait_for_addon(slug, expected_version=expected, expected_state="started")
+        return {"updated": False, "installed": True, "slug": slug, "version": expected, "state": current.get("state")}
+
+    if progress:
+        progress(f"Stopping Discovery v{current_version or 'unknown'}…", 86)
+    try:
+        supervisor_request(f"/addons/{slug}/stop", method="POST")
+    except urllib.error.HTTPError as exc:
+        if exc.code not in (400, 409):
+            raise
+
+    if progress:
+        progress(f"Rebuilding Discovery v{expected}…", 88)
+    supervisor_request(f"/addons/{slug}/rebuild", method="POST", payload={"force": True})
+    wait_for_addon(slug, expected_version=expected, timeout=600)
+
+    if progress:
+        progress("Starting updated Switch Vision Discovery…", 94)
+    supervisor_request(f"/addons/{slug}/start", method="POST")
+    final = wait_for_addon(slug, expected_version=expected, expected_state="started", timeout=300)
+    return {"updated": True, "installed": True, "slug": slug, "version": expected, "state": final.get("state")}
 
 def configured_switch_count(options: dict[str, Any] | None) -> int:
     if not isinstance(options, dict):
@@ -799,13 +907,33 @@ def install_release(root: Path, version: str, checksum: str, progress: Progress 
             except Exception as rollback_exc:
                 rollback_note = f" Automatic rollback also failed: {rollback_exc}"
         raise RuntimeError(f"Installation failed: {exc}.{rollback_note}") from exc
+    discovery_runtime: dict[str, Any] | None = None
+    if "Discovery add-on" in installed:
+        expected_discovery_version = read_packaged_app_version(root / "local_apps" / "switch_vision_discovery")
+        try:
+            discovery_runtime = rebuild_discovery_after_update(expected_discovery_version, progress)
+        except Exception as exc:
+            raise RuntimeError(
+                "Switch Vision files were installed, but Discovery could not be rebuilt and verified automatically: "
+                f"{exc}. Open the Discovery app, rebuild it, and confirm it reports v{expected_discovery_version}."
+            ) from exc
+        if discovery_runtime.get("installed") and normalise_version(discovery_runtime.get("version")) != expected_discovery_version:
+            raise RuntimeError(
+                f"Discovery version verification failed: expected v{expected_discovery_version}, "
+                f"received v{discovery_runtime.get('version') or 'unknown'}."
+            )
+
     if find_release_snmp2mqtt_dir(root) is None:
         warnings.append("The Switch Vision release does not contain an SNMP2MQTT add-on package; the existing add-on was left unchanged.")
     if not GENERATED_SNMP2MQTT_YAML.is_file():
         warnings.append("Generated SNMP2MQTT YAML was not found at /share/switch_vision/generated-snmp2mqtt.yaml.")
     actions=[]
     if "Custom component" in installed: actions.append("Restart Home Assistant Core")
-    if "Discovery add-on" in installed: actions.extend(["Rebuild or reinstall Switch Vision Discovery", "Start Switch Vision Discovery", "Run Discovery"])
+    if "Discovery add-on" in installed:
+        if discovery_runtime and discovery_runtime.get("installed"):
+            actions.append("Run Switch Vision Discovery")
+        else:
+            actions.extend(["Install Switch Vision Discovery", "Run Switch Vision Discovery"])
     if "SNMP2MQTT add-on" in installed: actions.extend(["Rebuild or reinstall Switch Vision SNMP2MQTT", "Restart Switch Vision SNMP2MQTT"])
     if "Dashboard frontend and visual assets" in installed: actions.append("Hard-refresh the browser if older frontend content remains")
     result = InstallResult(True, version, str(backup) if backup else None, installed, unchanged, preserved, warnings, actions, checksum, datetime.now(timezone.utc).isoformat())
