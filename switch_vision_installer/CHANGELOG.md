@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.9.6
+
+- Reduces Installer typography across titles, cards, controls, status rows, and activity output.
+- Tightens card padding, vertical spacing, component rows, checklists, and backup controls.
+- Increases the usable content width slightly so more information fits on screen.
+- Keeps the existing layout, colours, behaviour, and mobile responsiveness unchanged.
+
 ## v1.9.5
 
 - Handles Discovery updates that complete with the app stopped.
