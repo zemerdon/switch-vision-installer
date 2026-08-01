@@ -1,0 +1,116 @@
+from __future__ import annotations
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from dataclasses import asdict, is_dataclass
+import json, os, threading, time, traceback, urllib.request
+from installer import INSTALLER_VERSION, apply_backup_retention, create_manual_backup, delete_backup, download_and_install, dry_run, find_discovery_slug, find_snmp2mqtt_slug, install_supervisor_addon, latest_release, list_backups, restore_backup, status, validate_named_backup
+
+WEB_ROOT = Path(os.environ.get("SV_INSTALLER_WEB", "/opt/switch-vision-installer/www"))
+SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN", "")
+operation_lock = threading.Lock()
+operation = {"active": False, "kind": None, "message": "Ready.", "percent": 0, "result": None, "error": None}
+
+def set_progress(message: str, percent: int) -> None:
+    operation.update(message=message, percent=max(0, min(100, int(percent))))
+
+def supervisor_request(path: str, method: str = "POST") -> dict:
+    if not SUPERVISOR_TOKEN:
+        raise RuntimeError("Supervisor API token is unavailable.")
+    request = urllib.request.Request(
+        f"http://supervisor{path}",
+        method=method,
+        headers={
+            "Authorization": f"Bearer {SUPERVISOR_TOKEN}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+    )
+    with urllib.request.urlopen(request, timeout=30) as response:
+        raw = response.read()
+        if not raw:
+            return {"ok": True, "status": response.status}
+        content_type = response.headers.get("Content-Type", "")
+        if "json" in content_type.lower():
+            return json.loads(raw.decode("utf-8"))
+        text = raw.decode("utf-8", errors="replace").strip()
+        return {"ok": True, "status": response.status, "message": text[:500]}
+
+def request_core_restart_async() -> None:
+    # Return the ingress response before Core restarts and interrupts the connection.
+    time.sleep(0.75)
+    try:
+        supervisor_request("/core/restart")
+    except Exception:
+        traceback.print_exc()
+
+def run_job(kind: str, fn) -> None:
+    if not operation_lock.acquire(blocking=False): return
+    operation.update(active=True, kind=kind, message="Starting…", percent=1, result=None, error=None)
+    try:
+        result = fn()
+        operation["result"] = asdict(result) if is_dataclass(result) else result
+        operation["percent"] = 100
+    except Exception as exc: traceback.print_exc(); operation["error"] = str(exc); operation["message"] = f"{kind.title()} failed."
+    finally: operation["active"] = False; operation_lock.release()
+
+class Handler(BaseHTTPRequestHandler):
+    server_version = f"SwitchVisionInstaller/{INSTALLER_VERSION}"
+    def log_message(self, fmt: str, *args: object) -> None: print(f"[web] {self.address_string()} {fmt % args}", flush=True)
+    def send_json(self, payload: object, code: int = 200) -> None:
+        data=json.dumps(payload,indent=2).encode(); self.send_response(code); self.send_header("Content-Type","application/json; charset=utf-8"); self.send_header("Cache-Control","no-store"); self.send_header("Content-Length",str(len(data))); self.end_headers(); self.wfile.write(data)
+    def body(self) -> dict:
+        length=int(self.headers.get("Content-Length","0")); return json.loads(self.rfile.read(length).decode() or "{}")
+    def do_GET(self) -> None:
+        path=self.path.split("?",1)[0]
+        try:
+            if path=="/api/status": return self.send_json(status())
+            if path=="/api/latest": return self.send_json(latest_release())
+            if path=="/api/backups": return self.send_json({"backups":list_backups()})
+            if path=="/api/operation": return self.send_json(dict(operation))
+            filename="index.html" if path in {"/",""} else path.lstrip("/"); target=(WEB_ROOT/filename).resolve(); root=WEB_ROOT.resolve()
+            if root not in target.parents and target!=root: return self.send_error(403)
+            if not target.is_file(): return self.send_error(404)
+            types={".html":"text/html; charset=utf-8",".js":"application/javascript; charset=utf-8",".css":"text/css; charset=utf-8"}; data=target.read_bytes(); self.send_response(200); self.send_header("Content-Type",types.get(target.suffix,"text/plain")); self.send_header("Cache-Control","no-store"); self.send_header("Content-Length",str(len(data))); self.end_headers(); self.wfile.write(data)
+        except Exception as exc: self.send_json({"ok":False,"error":str(exc)},500)
+    def do_POST(self) -> None:
+        path=self.path.split("?",1)[0]
+        try:
+            if path=="/api/install":
+                if operation["active"]: return self.send_json({"ok":False,"error":"Another installer operation is already running."},409)
+                threading.Thread(target=run_job,args=("install",lambda:download_and_install(set_progress)),daemon=True).start(); return self.send_json({"ok":True,"started":True},202)
+            if path=="/api/dry-run":
+                if operation["active"]: return self.send_json({"ok":False,"error":"Another installer operation is already running."},409)
+                threading.Thread(target=run_job,args=("dry run",lambda:dry_run(set_progress)),daemon=True).start(); return self.send_json({"ok":True,"started":True},202)
+            if path=="/api/create-backup":
+                if operation["active"]: return self.send_json({"ok":False,"error":"Another installer operation is already running."},409)
+                threading.Thread(target=run_job,args=("backup",lambda:create_manual_backup(set_progress)),daemon=True).start(); return self.send_json({"ok":True,"started":True},202)
+            if path=="/api/validate-backup":
+                payload=self.body(); name=str(payload.get("name") or "")
+                if operation["active"]: return self.send_json({"ok":False,"error":"Another installer operation is already running."},409)
+                threading.Thread(target=run_job,args=("backup validation",lambda:validate_named_backup(name,set_progress)),daemon=True).start(); return self.send_json({"ok":True,"started":True},202)
+            if path=="/api/restore":
+                payload=self.body(); name=str(payload.get("name") or "")
+                if operation["active"]: return self.send_json({"ok":False,"error":"Another installer operation is already running."},409)
+                threading.Thread(target=run_job,args=("restore",lambda:restore_backup(name,set_progress)),daemon=True).start(); return self.send_json({"ok":True,"started":True},202)
+            if path=="/api/delete-backup": return self.send_json(delete_backup(str(self.body().get("name") or "")))
+            if path=="/api/prune-backups": return self.send_json(apply_backup_retention())
+            if path=="/api/restart-core":
+                threading.Thread(target=request_core_restart_async, daemon=True).start()
+                return self.send_json({"ok":True,"requested":True,"message":"Home Assistant Core restart requested."},202)
+            if path=="/api/install-discovery":
+                result = install_supervisor_addon("discovery")
+                return self.send_json({"ok":True,"requested":True,**result})
+            if path=="/api/restart-discovery":
+                result = supervisor_request(f"/addons/{find_discovery_slug()}/restart")
+                return self.send_json({"ok":True,"requested":True,"supervisor":result})
+            if path=="/api/install-snmp2mqtt":
+                result = install_supervisor_addon("snmp2mqtt")
+                return self.send_json({"ok":True,"requested":True,**result})
+            if path=="/api/restart-snmp2mqtt":
+                result = supervisor_request(f"/addons/{find_snmp2mqtt_slug()}/restart")
+                return self.send_json({"ok":True,"requested":True,"supervisor":result})
+            self.send_error(404)
+        except Exception as exc: traceback.print_exc(); self.send_json({"ok":False,"error":str(exc)},500)
+
+if __name__=="__main__":
+    print(f"Switch Vision Installer {INSTALLER_VERSION} listening on 0.0.0.0:8099",flush=True); ThreadingHTTPServer(("0.0.0.0",8099),Handler).serve_forever()

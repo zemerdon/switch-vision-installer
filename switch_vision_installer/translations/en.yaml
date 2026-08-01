@@ -1,0 +1,16 @@
+configuration:
+  release_api_url:
+    name: Release API URL
+    description: GitHub API endpoint used to locate the latest public release.
+  release_asset_pattern:
+    name: Release asset pattern
+    description: Filename pattern used to select the installable ZIP.
+  preserve_custom_assets:
+    name: Preserve custom assets
+    description: Preserve custom logos and faceplates that do not conflict with bundled files.
+  create_backup:
+    name: Create backup
+    description: Back up existing Switch Vision component folders before installation.
+  allow_prerelease:
+    name: Allow prereleases
+    description: Permit installation from a GitHub release marked as prerelease.

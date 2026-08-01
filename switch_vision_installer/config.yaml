@@ -1,0 +1,39 @@
+name: Switch Vision Installer
+version: "1.9.0"
+slug: switch_vision_installer
+description: Install and update Switch Vision from the official public release repository.
+url: https://github.com/zemerdon/switch-vision-installer
+arch:
+  - aarch64
+  - amd64
+startup: application
+boot: manual
+init: false
+stage: stable
+ingress: true
+ingress_port: 8099
+panel_icon: mdi:download-box-outline
+panel_title: Switch Vision Installer
+hassio_api: true
+hassio_role: manager
+map:
+  - type: homeassistant_config
+    read_only: false
+  - type: addons
+    read_only: false
+  - type: share
+    read_only: false
+options:
+  release_api_url: https://api.github.com/repos/zemerdon/switch-vision-releases/releases/latest
+  release_asset_pattern: switch-vision-*.zip
+  preserve_custom_assets: true
+  create_backup: true
+  allow_prerelease: false
+  backup_retention: 5
+schema:
+  release_api_url: url
+  release_asset_pattern: str
+  preserve_custom_assets: bool
+  create_backup: bool
+  allow_prerelease: bool
+  backup_retention: int(1,20)
