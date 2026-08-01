@@ -6,9 +6,32 @@ import json, os, threading, time, traceback, urllib.request
 from installer import INSTALLER_VERSION, apply_backup_retention, create_manual_backup, delete_backup, download_and_install, dry_run, find_discovery_slug, find_snmp2mqtt_slug, install_supervisor_addon, latest_release, list_backups, restore_backup, status, validate_named_backup
 
 WEB_ROOT = Path(os.environ.get("SV_INSTALLER_WEB", "/opt/switch-vision-installer/www"))
+UI_PREFERENCES_PATH = Path(os.environ.get("SV_UI_PREFERENCES", "/share/switch_vision/ui-preferences.json"))
+UI_DEFAULTS = {"density": "comfortable", "text_size": "normal", "content_width": "standard"}
+UI_ALLOWED = {
+    "density": {"comfortable", "compact", "dense"},
+    "text_size": {"normal", "small"},
+    "content_width": {"standard", "wide", "full"},
+}
 SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN", "")
 operation_lock = threading.Lock()
 operation = {"active": False, "kind": None, "message": "Ready.", "percent": 0, "result": None, "error": None}
+
+
+def installer_ui_preferences() -> dict[str, str]:
+    """Read and validate shared Switch Vision Installer UI preferences."""
+    values = dict(UI_DEFAULTS)
+    try:
+        document = json.loads(UI_PREFERENCES_PATH.read_text(encoding="utf-8"))
+        installer = document.get("installer", {}) if isinstance(document, dict) else {}
+        if isinstance(installer, dict):
+            for key, allowed in UI_ALLOWED.items():
+                candidate = str(installer.get(key, values[key])).strip().lower()
+                if candidate in allowed:
+                    values[key] = candidate
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        pass
+    return values
 
 def set_progress(message: str, percent: int) -> None:
     operation.update(message=message, percent=max(0, min(100, int(percent))))
@@ -67,6 +90,7 @@ class Handler(BaseHTTPRequestHandler):
             if path=="/api/latest": return self.send_json(latest_release())
             if path=="/api/backups": return self.send_json({"backups":list_backups()})
             if path=="/api/operation": return self.send_json(dict(operation))
+            if path=="/api/ui-preferences": return self.send_json(installer_ui_preferences())
             filename="index.html" if path in {"/",""} else path.lstrip("/"); target=(WEB_ROOT/filename).resolve(); root=WEB_ROOT.resolve()
             if root not in target.parents and target!=root: return self.send_error(403)
             if not target.is_file(): return self.send_error(404)

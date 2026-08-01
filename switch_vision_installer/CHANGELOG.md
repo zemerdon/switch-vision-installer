@@ -1,6 +1,15 @@
 # Changelog
 
-## v1.9.6
+## v1.9.7
+
+- Reads shared Installer UI preferences from `/share/switch_vision/ui-preferences.json`.
+- Supports Comfortable, Compact, and Dense spacing modes.
+- Supports Normal and Small text sizes.
+- Supports Standard, Wide, and Full content widths.
+- Validates all preference values and safely falls back to Comfortable / Normal / Standard when the file is missing or invalid.
+- Applies preferences whenever the Installer web interface is opened or refreshed.
+
+## v1.9.7
 
 - Reduces Installer typography across titles, cards, controls, status rows, and activity output.
 - Tightens card padding, vertical spacing, component rows, checklists, and backup controls.

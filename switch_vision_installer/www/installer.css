@@ -64,3 +64,78 @@ select{background:#07101d;color:#eaf2ff;border:1px solid #294867;min-width:280px
   .status-card{align-items:flex-start;flex-direction:column}
   select{min-width:100%;width:100%}
 }
+
+/* Shared Switch Vision UI preferences. Defaults remain comfortable / normal / standard. */
+body.text-small{
+  --sv-title:1.5rem;
+  --sv-section:1rem;
+  --sv-body:.82rem;
+  --sv-small:.72rem;
+}
+body.width-wide main{max-width:1280px}
+body.width-full main{max-width:none;width:100%}
+
+body.density-compact main{padding:14px 10px 28px}
+body.density-compact header{gap:10px;margin-bottom:10px}
+body.density-compact .mark{width:42px;height:42px;border-radius:12px;font-size:1.1rem}
+body.density-compact .grid{gap:7px}
+body.density-compact .grid article,
+body.density-compact .card{border-radius:10px;padding:9px 10px}
+body.density-compact .card{margin-top:8px}
+body.density-compact .components{gap:4px}
+body.density-compact .component{padding:5px 8px}
+body.density-compact .details{gap:6px}
+body.density-compact .details>div{padding:6px 7px}
+body.density-compact .actions,
+body.density-compact .restore-row{gap:5px}
+body.density-compact button,
+body.density-compact select{padding:7px 10px}
+body.density-compact .backup-meta,
+body.density-compact .progress-text{margin-top:6px;padding:6px 7px}
+body.density-compact .result{padding:8px 9px}
+body.density-compact .guidance{margin-top:7px;padding:8px}
+body.density-compact .backup-policy{gap:5px;margin:5px 0 7px}
+body.density-compact .backup-policy span{padding:4px 7px}
+body.density-compact .checklist{gap:5px}
+body.density-compact .check-item{gap:5px;padding:6px 7px}
+
+body.density-dense main{padding:8px 7px 18px}
+body.density-dense header{gap:8px;margin-bottom:7px}
+body.density-dense header p{margin-top:1px}
+body.density-dense .mark{width:36px;height:36px;border-radius:10px;font-size:1rem}
+body.density-dense h2{margin-bottom:5px}
+body.density-dense h3{margin-bottom:4px}
+body.density-dense p{margin:4px 0 6px;line-height:1.3}
+body.density-dense .grid{gap:4px}
+body.density-dense .grid article,
+body.density-dense .card{border-radius:8px;padding:6px 7px;box-shadow:0 6px 18px #0003}
+body.density-dense .grid strong{margin-top:2px;font-size:1.08rem}
+body.density-dense .card{margin-top:5px}
+body.density-dense .status-card{gap:8px}
+body.density-dense .badge{padding:3px 7px}
+body.density-dense .components{gap:3px}
+body.density-dense .component{gap:8px;padding:4px 6px;border-radius:6px}
+body.density-dense .details{gap:4px}
+body.density-dense .details>div{padding:4px 6px;border-radius:6px}
+body.density-dense .details strong{margin-top:2px}
+body.density-dense .actions,
+body.density-dense .restore-row{gap:4px}
+body.density-dense button,
+body.density-dense select{border-radius:6px;padding:6px 8px}
+body.density-dense .warning{margin-top:5px}
+body.density-dense .backup-meta,
+body.density-dense .progress-text{margin-top:4px;padding:5px 6px;border-radius:6px}
+body.density-dense .result{padding:6px 7px;border-radius:6px;line-height:1.3}
+body.density-dense .progress{margin-bottom:5px}
+body.density-dense .guidance{margin-top:5px;padding:6px;border-radius:6px}
+body.density-dense .guidance ol{margin-top:3px}
+body.density-dense .backup-policy{gap:4px;margin:4px 0 6px}
+body.density-dense .backup-policy span{padding:3px 6px}
+body.density-dense .checklist{gap:4px}
+body.density-dense .check-item{gap:4px;padding:5px 6px;border-radius:6px}
+
+@media(max-width:720px){
+  body.width-wide main,body.width-full main{max-width:none;width:100%}
+  body.density-compact main{padding:12px 8px 24px}
+  body.density-dense main{padding:8px 6px 18px}
+}

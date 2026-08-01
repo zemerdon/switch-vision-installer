@@ -39,3 +39,7 @@ The latest public GitHub release should include:
 - a supported checksum asset such as `SHA256SUMS.txt` or a matching `.sha256` file
 
 The GitHub release must be marked **Latest** for the default Installer configuration to detect it.
+## UI preferences
+
+Installer v1.9.7 reads its density, text-size, and content-width preferences from `/share/switch_vision/ui-preferences.json`. Configure these values through the Switch Vision integration options. Missing or invalid preferences fall back safely to Comfortable, Normal, and Standard.
+
