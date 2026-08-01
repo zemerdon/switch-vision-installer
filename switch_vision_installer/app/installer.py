@@ -16,7 +16,7 @@ import urllib.error
 import zipfile
 import re
 
-INSTALLER_VERSION = "1.9.4"
+INSTALLER_VERSION = "1.9.5"
 OPTIONS_PATH = Path(os.environ.get("SV_INSTALLER_OPTIONS", "/data/options.json"))
 STATE_PATH = Path(os.environ.get("SV_INSTALLER_STATE", "/data/state.json"))
 WORK_DIR = Path(os.environ.get("SV_INSTALLER_WORK", "/data/work"))
@@ -214,7 +214,12 @@ def update_discovery_after_install(expected_version: str, progress: Progress | N
         payload={"backup": False, "background": False},
     )
 
-    final = wait_for_addon(slug, expected_version=expected, expected_state="started", timeout=900)
+    final = wait_for_addon(slug, expected_version=expected, timeout=900)
+    if str(final.get("state") or "").lower() != "started":
+        if progress:
+            progress("Starting Switch Vision Discovery…", 96)
+        supervisor_request(f"/addons/{slug}/start", method="POST")
+        final = wait_for_addon(slug, expected_version=expected, expected_state="started", timeout=300)
     return {"updated": True, "installed": True, "slug": slug, "version": expected, "state": final.get("state")}
 
 def configured_switch_count(options: dict[str, Any] | None) -> int:

@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.9.5
+
+- Handles Discovery updates that complete with the app stopped.
+- Waits for the expected Discovery version first, then starts the app when necessary.
+- Verifies the final Discovery version and running state before reporting success.
+- Prevents the installer from remaining at 90% after a successful Supervisor update.
+
 ## v1.9.4
 
 - Uses Home Assistant Supervisor's normal app update endpoint for versioned Discovery updates.
