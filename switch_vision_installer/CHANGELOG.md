@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.9.10
+
+- Moves Release details above Components in the Installer UI.
+
 ## v1.9.9
 
 - Removes the Open Switch Vision launch block from the Installer UI.
