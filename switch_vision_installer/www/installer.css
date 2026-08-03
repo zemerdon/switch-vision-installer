@@ -40,6 +40,15 @@ p{color:#aabbd0;margin:7px 0 10px;line-height:1.4}
 .changelog-content pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#0d1b2d;border-radius:7px;padding:9px}
 .changelog-content a{color:#7fb7ef}
 .card{margin-top:11px}
+
+.collapsible-card{padding:0;overflow:hidden}
+.collapsible-card>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 14px;cursor:pointer;list-style:none;user-select:none}
+.collapsible-card>summary::-webkit-details-marker{display:none}
+.collapsible-card>summary h2{margin:0}
+.collapsible-card>summary:hover{background:#10243a}
+.collapsible-content{padding:0 14px 13px}
+.collapse-icon{width:10px;height:10px;border-right:2px solid #8fb5d8;border-bottom:2px solid #8fb5d8;transform:rotate(45deg);transition:transform .18s ease;margin-right:3px}
+.collapsible-card[open] .collapse-icon{transform:rotate(225deg);margin-top:6px}
 .status-card{display:flex;justify-content:space-between;gap:12px;align-items:center}
 .status-card p{margin-bottom:0}
 .badge{white-space:nowrap;border-radius:999px;padding:5px 9px;font-size:var(--sv-small);font-weight:700;background:#26384d}
@@ -156,3 +165,8 @@ body.density-dense .check-item{gap:4px;padding:5px 6px;border-radius:6px}
   body.density-compact main{padding:12px 8px 24px}
   body.density-dense main{padding:8px 6px 18px}
 }
+
+body.density-compact .collapsible-card>summary{padding:9px 10px}
+body.density-compact .collapsible-content{padding:0 10px 9px}
+body.density-dense .collapsible-card>summary{padding:6px 7px}
+body.density-dense .collapsible-content{padding:0 7px 6px}

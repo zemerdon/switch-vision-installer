@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.9.9
+
+- Removes the Open Switch Vision launch block from the Installer UI.
+- Moves Backups to the bottom of the Installer page.
+- Makes Readiness checklist, Activity, and Backups collapsible.
+- Remembers each collapsible section state in the browser.
+- Automatically expands Activity while an operation is running.
+
 ## v1.9.8
 
 - Moves the Activity panel directly above Backups so installation and backup progress remain close to the related controls.
