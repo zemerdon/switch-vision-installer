@@ -16,7 +16,7 @@ import urllib.error
 import zipfile
 import re
 
-INSTALLER_VERSION = "1.9.7"
+INSTALLER_VERSION = "1.9.8"
 OPTIONS_PATH = Path(os.environ.get("SV_INSTALLER_OPTIONS", "/data/options.json"))
 STATE_PATH = Path(os.environ.get("SV_INSTALLER_STATE", "/data/state.json"))
 WORK_DIR = Path(os.environ.get("SV_INSTALLER_WORK", "/data/work"))
@@ -473,6 +473,7 @@ def latest_release() -> dict[str, Any]:
         "published_at": payload.get("published_at"), "asset_name": asset.get("name"),
         "asset_url": asset.get("browser_download_url"), "asset_size": asset.get("size"),
         "html_url": payload.get("html_url"),
+        "changelog": payload.get("body") or "",
         "checksum_asset_name": checksum_asset.get("name") if checksum_asset else None,
         "checksum_asset_url": checksum_asset.get("browser_download_url") if checksum_asset else None,
     }

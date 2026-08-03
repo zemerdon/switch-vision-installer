@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.9.8
+
+- Moves the Activity panel directly above Backups so installation and backup progress remain close to the related controls.
+- Adds a Show changelog button beside the latest Switch Vision release version.
+- Displays the latest GitHub release notes in a safe, expandable Installer panel.
+- Keeps release installation available when release notes are empty or unavailable.
+
 ## v1.9.7
 
 - Reads shared Installer UI preferences from `/share/switch_vision/ui-preferences.json`.

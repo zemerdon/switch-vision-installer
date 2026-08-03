@@ -24,6 +24,21 @@ p{color:#aabbd0;margin:7px 0 10px;line-height:1.4}
 .grid article,.card{background:#0d1b2d;border:1px solid #23415f;border-radius:13px;padding:13px 14px;box-shadow:0 10px 28px #0004}
 .grid span,.details span{display:block;color:#8fa5bc;font-size:var(--sv-small)}
 .grid strong{display:block;margin-top:4px;font-size:1.18rem;line-height:1.2}
+.latest-release-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:4px}
+.latest-release-row strong{margin-top:0}
+.link-button{padding:5px 8px;background:transparent;color:#7fb7ef;border:1px solid #315879;font-size:var(--sv-small);white-space:nowrap}
+.link-button:hover{background:#15314d}
+.changelog-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.changelog-heading p{margin-bottom:0}
+.changelog-content{margin-top:10px;padding:12px;background:#07101d;border-radius:8px;color:#c6d5e5;line-height:1.5;max-height:55vh;overflow:auto}
+.changelog-content h1,.changelog-content h2,.changelog-content h3{margin:14px 0 7px;color:#eaf2ff}
+.changelog-content h1:first-child,.changelog-content h2:first-child,.changelog-content h3:first-child{margin-top:0}
+.changelog-content p{margin:7px 0;color:#c6d5e5}
+.changelog-content ul{margin:7px 0 7px 20px;padding:0}
+.changelog-content li{margin:4px 0}
+.changelog-content code{background:#10243a;border-radius:5px;padding:2px 5px;font-size:.8rem}
+.changelog-content pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#0d1b2d;border-radius:7px;padding:9px}
+.changelog-content a{color:#7fb7ef}
 .card{margin-top:11px}
 .status-card{display:flex;justify-content:space-between;gap:12px;align-items:center}
 .status-card p{margin-bottom:0}
@@ -62,6 +77,8 @@ select{background:#07101d;color:#eaf2ff;border:1px solid #294867;min-width:280px
   .grid,.details{grid-template-columns:1fr}
   header{align-items:flex-start}
   .status-card{align-items:flex-start;flex-direction:column}
+  .latest-release-row{align-items:flex-start;flex-direction:column}
+  .changelog-heading{align-items:flex-start}
   select{min-width:100%;width:100%}
 }
 
