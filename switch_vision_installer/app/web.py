@@ -3,7 +3,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from dataclasses import asdict, is_dataclass
 import json, os, threading, time, traceback, urllib.request
-from installer import INSTALLER_VERSION, apply_backup_retention, create_manual_backup, delete_backup, download_and_install, dry_run, find_discovery_slug, find_snmp2mqtt_slug, install_supervisor_addon, latest_release, list_backups, restore_backup, status, validate_named_backup
+import installer as installer_core
+
+INSTALLER_VERSION = str(os.environ.get("SV_INSTALLER_VERSION") or installer_core.INSTALLER_VERSION).strip()
+installer_core.INSTALLER_VERSION = INSTALLER_VERSION
+
+from installer import apply_backup_retention, create_manual_backup, delete_backup, download_and_install, dry_run, find_discovery_slug, find_snmp2mqtt_slug, install_supervisor_addon, latest_release, list_backups, load_options, restore_backup, status, validate_named_backup
 
 WEB_ROOT = Path(os.environ.get("SV_INSTALLER_WEB", "/opt/switch-vision-installer/www"))
 UI_PREFERENCES_PATH = Path(os.environ.get("SV_UI_PREFERENCES", "/share/switch_vision/ui-preferences.json"))
@@ -33,8 +38,52 @@ def installer_ui_preferences() -> dict[str, str]:
         pass
     return values
 
+
+def release_history() -> dict[str, object]:
+    """Return public Switch Vision GitHub releases newest-first for changelog browsing."""
+    options = load_options()
+    latest_url = str(options.get("release_api_url") or "").strip()
+    base_url = latest_url.split("?", 1)[0].rstrip("/")
+    if base_url.endswith("/latest"):
+        base_url = base_url[:-len("/latest")]
+    if not base_url.endswith("/releases"):
+        raise RuntimeError("Configured release API URL does not identify a GitHub releases endpoint.")
+
+    request = urllib.request.Request(
+        f"{base_url}?per_page=100",
+        headers={
+            "Accept": "application/vnd.github+json",
+            "User-Agent": f"Switch-Vision-Installer/{INSTALLER_VERSION}",
+        },
+    )
+    with urllib.request.urlopen(request, timeout=30) as response:
+        payload = json.load(response)
+    if not isinstance(payload, list):
+        raise RuntimeError("GitHub release history returned an unexpected response.")
+
+    allow_prerelease = bool(options.get("allow_prerelease"))
+    releases: list[dict[str, object]] = []
+    for item in payload:
+        if not isinstance(item, dict) or item.get("draft"):
+            continue
+        if item.get("prerelease") and not allow_prerelease:
+            continue
+        version = str(item.get("tag_name") or item.get("name") or "").strip().lstrip("v")
+        if not version:
+            continue
+        releases.append({
+            "version": version,
+            "name": item.get("name") or item.get("tag_name"),
+            "published_at": item.get("published_at"),
+            "html_url": item.get("html_url"),
+            "changelog": item.get("body") or "",
+        })
+    return {"releases": releases}
+
+
 def set_progress(message: str, percent: int) -> None:
     operation.update(message=message, percent=max(0, min(100, int(percent))))
+
 
 def supervisor_request(path: str, method: str = "POST") -> dict:
     if not SUPERVISOR_TOKEN:
@@ -58,6 +107,7 @@ def supervisor_request(path: str, method: str = "POST") -> dict:
         text = raw.decode("utf-8", errors="replace").strip()
         return {"ok": True, "status": response.status, "message": text[:500]}
 
+
 def request_core_restart_async() -> None:
     # Return the ingress response before Core restarts and interrupts the connection.
     time.sleep(0.75)
@@ -65,6 +115,7 @@ def request_core_restart_async() -> None:
         supervisor_request("/core/restart")
     except Exception:
         traceback.print_exc()
+
 
 def run_job(kind: str, fn) -> None:
     if not operation_lock.acquire(blocking=False): return
@@ -75,6 +126,7 @@ def run_job(kind: str, fn) -> None:
         operation["percent"] = 100
     except Exception as exc: traceback.print_exc(); operation["error"] = str(exc); operation["message"] = f"{kind.title()} failed."
     finally: operation["active"] = False; operation_lock.release()
+
 
 class Handler(BaseHTTPRequestHandler):
     server_version = f"SwitchVisionInstaller/{INSTALLER_VERSION}"
@@ -88,6 +140,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path=="/api/status": return self.send_json(status())
             if path=="/api/latest": return self.send_json(latest_release())
+            if path=="/api/releases": return self.send_json(release_history())
             if path=="/api/backups": return self.send_json({"backups":list_backups()})
             if path=="/api/operation": return self.send_json(dict(operation))
             if path=="/api/ui-preferences": return self.send_json(installer_ui_preferences())
@@ -135,6 +188,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json({"ok":True,"requested":True,"supervisor":result})
             self.send_error(404)
         except Exception as exc: traceback.print_exc(); self.send_json({"ok":False,"error":str(exc)},500)
+
 
 if __name__=="__main__":
     print(f"Switch Vision Installer {INSTALLER_VERSION} listening on 0.0.0.0:8099",flush=True); ThreadingHTTPServer(("0.0.0.0",8099),Handler).serve_forever()

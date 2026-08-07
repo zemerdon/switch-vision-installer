@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.9.11
+
+- Adds simple left/right navigation to browse previous and newer Switch Vision GitHub release changelogs.
+- Uses the configured release API repository as the changelog-history source.
+- Keeps the current public release as the default changelog view.
+- Loads and caches release history only when the changelog panel is opened.
+- Aligns the Installer runtime version with the Home Assistant build version.
+
 ## v1.9.10
 
 - Moves Release details above Components in the Installer UI.

@@ -1,8 +1,16 @@
-# Switch Vision Installer v1.9.10
+# Switch Vision Installer v1.9.11
 
 Official Home Assistant App for installing and updating Switch Vision from the public Switch Vision release repository.
 
 The Installer has its own version line. The Installer version identifies this app; the installed and available Switch Vision versions are shown separately in the Web UI.
+
+## v1.9.11
+
+- Adds simple left/right navigation to the in-app Switch Vision changelog viewer.
+- Browses actual GitHub release history from the configured Switch Vision release API, newest first.
+- Opens the current public release by default and disables navigation at the newest/oldest available entries.
+- Loads release history only when the changelog is opened and caches it for the current Installer page session.
+- Propagates the Home Assistant build version into the Installer runtime so the Web UI and request User-Agent stay aligned with the App version.
 
 ## v1.9.10
 
@@ -44,5 +52,5 @@ The Installer has its own version line. The Installer version identifies this ap
 New backups are stored under `/share/switch-vision-backups/`. Existing backups under `/share/switch_vision/installer_backups/` remain visible and restorable.
 ## UI preferences
 
-Installer v1.9.10 reads its density, text-size, and content-width preferences from `/share/switch_vision/ui-preferences.json`. Configure these values through the Switch Vision integration options. Missing or invalid preferences fall back safely to Comfortable, Normal, and Standard.
+Installer v1.9.11 reads its density, text-size, and content-width preferences from `/share/switch_vision/ui-preferences.json`. Configure these values through the Switch Vision integration options. Missing or invalid preferences fall back safely to Comfortable, Normal, and Standard.
 
