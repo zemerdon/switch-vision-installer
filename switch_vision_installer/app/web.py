@@ -8,7 +8,7 @@ import installer as installer_core
 INSTALLER_VERSION = str(os.environ.get("SV_INSTALLER_VERSION") or installer_core.INSTALLER_VERSION).strip()
 installer_core.INSTALLER_VERSION = INSTALLER_VERSION
 
-from installer import apply_backup_retention, create_manual_backup, delete_backup, download_and_install, dry_run, find_discovery_slug, find_snmp2mqtt_slug, install_supervisor_addon, latest_release, list_backups, load_options, restore_backup, status, validate_named_backup
+from installer import apply_backup_retention, create_manual_backup, delete_backup, discovery_status, download_and_install, dry_run, find_discovery_slug, find_snmp2mqtt_slug, install_supervisor_addon, latest_release, list_backups, load_options, restore_backup, snmp2mqtt_status, status, validate_named_backup
 from repository_setup import ensure_snmp2mqtt_repository
 
 WEB_ROOT = Path(os.environ.get("SV_INSTALLER_WEB", "/opt/switch-vision-installer/www"))
@@ -94,6 +94,29 @@ def install_switch_vision():
         repository_warning = str(exc)
 
     result = download_and_install(set_progress)
+
+    # Fresh-install convenience: only install Supervisor apps that are missing.
+    try:
+        discovery = discovery_status()
+        if not discovery.get("installed"):
+            set_progress("Installing Switch Vision Discovery…", 96)
+            install_supervisor_addon("discovery")
+    except Exception as exc:
+        result.warnings.append(
+            "Switch Vision installed, but Discovery could not be installed automatically: "
+            + str(exc)
+        )
+
+    try:
+        snmp = snmp2mqtt_status()
+        if not snmp.get("installed"):
+            set_progress("Installing Switch Vision SNMP2MQTT…", 98)
+            install_supervisor_addon("snmp2mqtt")
+    except Exception as exc:
+        result.warnings.append(
+            "Switch Vision installed, but SNMP2MQTT could not be installed automatically: "
+            + str(exc)
+        )
 
     if repository_warning:
         result.warnings.append(

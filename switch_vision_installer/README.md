@@ -1,8 +1,15 @@
-# Switch Vision Installer v2.0.0
+# Switch Vision Installer v2.0.1
 
 Official Home Assistant App for installing and updating Switch Vision from the public Switch Vision release repository.
 
 The Installer has its own version line. The Installer version identifies this app; the installed and available Switch Vision versions are shown separately in the Web UI.
+
+## v2.0.1
+
+- The main Install Switch Vision action now installs Discovery automatically when it is not already installed.
+- The main Install Switch Vision action now installs SNMP2MQTT automatically when it is not already installed.
+- Existing installed apps are left alone.
+- Manual app-install buttons remain available for recovery.
 
 ## v2.0.0
 
@@ -59,5 +66,5 @@ The Installer has its own version line. The Installer version identifies this ap
 New backups are stored under `/share/switch-vision-backups/`. Existing backups under `/share/switch_vision/installer_backups/` remain visible and restorable.
 ## UI preferences
 
-Installer v2.0.0 reads its density, text-size, and content-width preferences from `/share/switch_vision/ui-preferences.json`. Configure these values through the Switch Vision integration options. Missing or invalid preferences fall back safely to Comfortable, Normal, and Standard.
+Installer v2.0.1 reads its density, text-size, and content-width preferences from `/share/switch_vision/ui-preferences.json`. Configure these values through the Switch Vision integration options. Missing or invalid preferences fall back safely to Comfortable, Normal, and Standard.
 

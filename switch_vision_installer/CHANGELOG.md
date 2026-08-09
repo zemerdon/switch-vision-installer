@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.0.1
+
+- Automatically installs Switch Vision Discovery when the main installation finds it missing.
+- Automatically installs Switch Vision SNMP2MQTT when the main installation finds it missing.
+- Leaves already-installed Discovery and SNMP2MQTT apps untouched.
+- Keeps the individual Install Discovery and Install SNMP2MQTT controls as manual recovery actions.
+- Reports automatic app-install failures as warnings without discarding an otherwise successful Switch Vision file installation.
+
+
 ## v2.0.0
 
 - Aligns the Installer release line with Switch Vision 2.x.
