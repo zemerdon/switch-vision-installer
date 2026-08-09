@@ -16,7 +16,7 @@ import urllib.error
 import zipfile
 import re
 
-INSTALLER_VERSION = "1.9.10"
+INSTALLER_VERSION = "2.0.0"
 OPTIONS_PATH = Path(os.environ.get("SV_INSTALLER_OPTIONS", "/data/options.json"))
 STATE_PATH = Path(os.environ.get("SV_INSTALLER_STATE", "/data/state.json"))
 WORK_DIR = Path(os.environ.get("SV_INSTALLER_WORK", "/data/work"))

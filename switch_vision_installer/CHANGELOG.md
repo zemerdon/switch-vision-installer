@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.0.0
+
+- Aligns the Installer release line with Switch Vision 2.x.
+- Automatically registers the official `switch-vision-snmp2mqtt-addon` repository when SNMP2MQTT is not already available.
+- Reloads the Home Assistant App store and waits for Switch Vision SNMP2MQTT to become discoverable.
+- Makes the standalone SNMP2MQTT install action ensure the repository exists first.
+- Keeps repository-registration failure non-blocking for the main Switch Vision installation and reports it as a warning.
+
+
 ## v1.9.11
 
 - Adds simple left/right navigation to browse previous and newer Switch Vision GitHub release changelogs.

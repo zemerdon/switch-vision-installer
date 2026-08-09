@@ -9,6 +9,7 @@ INSTALLER_VERSION = str(os.environ.get("SV_INSTALLER_VERSION") or installer_core
 installer_core.INSTALLER_VERSION = INSTALLER_VERSION
 
 from installer import apply_backup_retention, create_manual_backup, delete_backup, download_and_install, dry_run, find_discovery_slug, find_snmp2mqtt_slug, install_supervisor_addon, latest_release, list_backups, load_options, restore_backup, status, validate_named_backup
+from repository_setup import ensure_snmp2mqtt_repository
 
 WEB_ROOT = Path(os.environ.get("SV_INSTALLER_WEB", "/opt/switch-vision-installer/www"))
 UI_PREFERENCES_PATH = Path(os.environ.get("SV_UI_PREFERENCES", "/share/switch_vision/ui-preferences.json"))
@@ -85,6 +86,23 @@ def set_progress(message: str, percent: int) -> None:
     operation.update(message=message, percent=max(0, min(100, int(percent))))
 
 
+def install_switch_vision():
+    repository_warning = None
+    try:
+        ensure_snmp2mqtt_repository(set_progress)
+    except Exception as exc:
+        repository_warning = str(exc)
+
+    result = download_and_install(set_progress)
+
+    if repository_warning:
+        result.warnings.append(
+            "Switch Vision installed, but the SNMP2MQTT App repository could not be registered automatically: "
+            + repository_warning
+        )
+    return result
+
+
 def supervisor_request(path: str, method: str = "POST") -> dict:
     if not SUPERVISOR_TOKEN:
         raise RuntimeError("Supervisor API token is unavailable.")
@@ -154,7 +172,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path=="/api/install":
                 if operation["active"]: return self.send_json({"ok":False,"error":"Another installer operation is already running."},409)
-                threading.Thread(target=run_job,args=("install",lambda:download_and_install(set_progress)),daemon=True).start(); return self.send_json({"ok":True,"started":True},202)
+                threading.Thread(target=run_job,args=("install",install_switch_vision),daemon=True).start(); return self.send_json({"ok":True,"started":True},202)
             if path=="/api/dry-run":
                 if operation["active"]: return self.send_json({"ok":False,"error":"Another installer operation is already running."},409)
                 threading.Thread(target=run_job,args=("dry run",lambda:dry_run(set_progress)),daemon=True).start(); return self.send_json({"ok":True,"started":True},202)
@@ -181,6 +199,7 @@ class Handler(BaseHTTPRequestHandler):
                 result = supervisor_request(f"/addons/{find_discovery_slug()}/restart")
                 return self.send_json({"ok":True,"requested":True,"supervisor":result})
             if path=="/api/install-snmp2mqtt":
+                ensure_snmp2mqtt_repository()
                 result = install_supervisor_addon("snmp2mqtt")
                 return self.send_json({"ok":True,"requested":True,**result})
             if path=="/api/restart-snmp2mqtt":
