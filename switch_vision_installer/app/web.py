@@ -8,7 +8,7 @@ import installer as installer_core
 INSTALLER_VERSION = str(os.environ.get("SV_INSTALLER_VERSION") or installer_core.INSTALLER_VERSION).strip()
 installer_core.INSTALLER_VERSION = INSTALLER_VERSION
 
-from installer import apply_backup_retention, create_manual_backup, delete_backup, discovery_status, download_and_install, dry_run, find_discovery_slug, find_snmp2mqtt_slug, find_unifi2mqtt_slug, get_unifi2mqtt_options, install_supervisor_addon, latest_release, list_backups, load_options, restore_backup, set_unifi2mqtt_options, snmp2mqtt_status, status, unifi2mqtt_status, validate_named_backup
+from installer import apply_backup_retention, create_manual_backup, delete_backup, discovery_status, download_and_install, dry_run, find_discovery_slug, find_snmp2mqtt_slug, find_unifi2mqtt_slug, install_supervisor_addon, latest_release, list_backups, load_options, restore_backup, snmp2mqtt_status, status, unifi2mqtt_status, validate_named_backup
 from repository_setup import ensure_snmp2mqtt_repository, ensure_unifi2mqtt_repository
 
 WEB_ROOT = Path(os.environ.get("SV_INSTALLER_WEB", "/opt/switch-vision-installer/www"))
@@ -149,123 +149,6 @@ def supervisor_request(path: str, method: str = "POST") -> dict:
         return {"ok": True, "status": response.status, "message": text[:500]}
 
 
-def _bool_value(value: object) -> bool:
-    if isinstance(value, bool):
-        return value
-    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
-
-
-def unifi2mqtt_public_config() -> dict[str, object]:
-    state = unifi2mqtt_status()
-    if not state.get("installed"):
-        return {
-            "installed": False,
-            "state": state.get("state"),
-            "options": {},
-            "api_key_set": False,
-            "mqtt_password_set": False,
-        }
-
-    options = get_unifi2mqtt_options() or {}
-    public = {
-        "controller_url": str(options.get("controller_url") or ""),
-        "site_id": str(options.get("site_id") or ""),
-        "verify_ssl": _bool_value(options.get("verify_ssl")),
-        "poll_interval": int(options.get("poll_interval") or 30),
-        "mqtt_host": str(options.get("mqtt_host") or "core-mosquitto"),
-        "mqtt_port": int(options.get("mqtt_port") or 1883),
-        "mqtt_username": str(options.get("mqtt_username") or ""),
-        "mqtt_topic_prefix": str(options.get("mqtt_topic_prefix") or "switch_vision/unifi"),
-        "mqtt_discovery_prefix": str(options.get("mqtt_discovery_prefix") or "homeassistant"),
-    }
-    return {
-        "installed": True,
-        "state": state.get("state"),
-        "options": public,
-        "api_key_set": bool(str(options.get("api_key") or "").strip()),
-        "mqtt_password_set": bool(str(options.get("mqtt_password") or "").strip()),
-    }
-
-
-def configure_and_start_unifi2mqtt(payload: dict[str, object]) -> dict[str, object]:
-    state = unifi2mqtt_status()
-    if not state.get("installed"):
-        raise RuntimeError("Install Switch Vision UniFi2MQTT before configuring it.")
-
-    current = get_unifi2mqtt_options() or {}
-    controller_url = str(payload.get("controller_url") or "").strip().rstrip("/")
-    site_id = str(payload.get("site_id") or "").strip()
-    api_key_new = str(payload.get("api_key") or "").strip()
-    api_key = api_key_new or str(current.get("api_key") or "").strip()
-    mqtt_host = str(payload.get("mqtt_host") or "").strip()
-    mqtt_username = str(payload.get("mqtt_username") or "").strip()
-    mqtt_password_new = str(payload.get("mqtt_password") or "")
-    mqtt_password = mqtt_password_new if mqtt_password_new else str(current.get("mqtt_password") or "")
-    mqtt_topic_prefix = str(payload.get("mqtt_topic_prefix") or "").strip().strip("/")
-    mqtt_discovery_prefix = str(payload.get("mqtt_discovery_prefix") or "").strip().strip("/")
-
-    if not controller_url:
-        raise RuntimeError("Controller URL is required.")
-    if not controller_url.lower().startswith(("http://", "https://")):
-        raise RuntimeError("Controller URL must begin with http:// or https://.")
-    if not site_id:
-        raise RuntimeError("Site ID is required.")
-    if not api_key:
-        raise RuntimeError("API key is required.")
-    if not mqtt_host:
-        raise RuntimeError("MQTT host is required.")
-    if not mqtt_topic_prefix:
-        raise RuntimeError("MQTT topic prefix is required.")
-    if not mqtt_discovery_prefix:
-        raise RuntimeError("MQTT discovery prefix is required.")
-
-    try:
-        poll_interval = int(payload.get("poll_interval") or 30)
-    except (TypeError, ValueError):
-        raise RuntimeError("Poll interval must be a number.")
-    if not 10 <= poll_interval <= 300:
-        raise RuntimeError("Poll interval must be between 10 and 300 seconds.")
-
-    try:
-        mqtt_port = int(payload.get("mqtt_port") or 1883)
-    except (TypeError, ValueError):
-        raise RuntimeError("MQTT port must be a number.")
-    if not 1 <= mqtt_port <= 65535:
-        raise RuntimeError("MQTT port must be between 1 and 65535.")
-
-    options = {
-        "controller_url": controller_url,
-        "site_id": site_id,
-        "api_key": api_key,
-        "verify_ssl": "true" if _bool_value(payload.get("verify_ssl")) else "false",
-        "poll_interval": str(poll_interval),
-        "mqtt_host": mqtt_host,
-        "mqtt_port": str(mqtt_port),
-        "mqtt_username": mqtt_username,
-        "mqtt_password": mqtt_password,
-        "mqtt_topic_prefix": mqtt_topic_prefix,
-        "mqtt_discovery_prefix": mqtt_discovery_prefix,
-    }
-    set_unifi2mqtt_options(options)
-
-    slug = find_unifi2mqtt_slug()
-    if str(state.get("state") or "").lower() == "started":
-        installer_core.supervisor_request(f"/addons/{slug}/restart", method="POST")
-    else:
-        installer_core.supervisor_request(f"/addons/{slug}/start", method="POST")
-
-    final = installer_core.wait_for_addon(slug, expected_state="started", timeout=120)
-    return {
-        "ok": True,
-        "slug": slug,
-        "state": final.get("state"),
-        "version": final.get("version"),
-        "api_key_set": True,
-        "mqtt_password_set": bool(mqtt_password),
-        "message": "UniFi2MQTT configuration saved and the add-on is running.",
-    }
-
-
 def request_core_restart_async() -> None:
     # Return the ingress response before Core restarts and interrupts the connection.
     time.sleep(0.75)
@@ -302,7 +185,6 @@ class Handler(BaseHTTPRequestHandler):
             if path=="/api/backups": return self.send_json({"backups":list_backups()})
             if path=="/api/operation": return self.send_json(dict(operation))
             if path=="/api/ui-preferences": return self.send_json(installer_ui_preferences())
-            if path=="/api/unifi2mqtt-config": return self.send_json(unifi2mqtt_public_config())
             filename="index.html" if path in {"/",""} else path.lstrip("/"); target=(WEB_ROOT/filename).resolve(); root=WEB_ROOT.resolve()
             if root not in target.parents and target!=root: return self.send_error(403)
             if not target.is_file(): return self.send_error(404)
@@ -353,10 +235,6 @@ class Handler(BaseHTTPRequestHandler):
             if path=="/api/restart-unifi2mqtt":
                 result = supervisor_request(f"/addons/{find_unifi2mqtt_slug()}/restart")
                 return self.send_json({"ok":True,"requested":True,"supervisor":result})
-            if path=="/api/configure-unifi2mqtt":
-                payload = self.body()
-                result = configure_and_start_unifi2mqtt(payload)
-                return self.send_json(result)
             self.send_error(404)
         except Exception as exc: traceback.print_exc(); self.send_json({"ok":False,"error":str(exc)},500)
 

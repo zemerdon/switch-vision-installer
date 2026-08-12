@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.1.2
+
+- Moves UniFi2MQTT credentials and runtime configuration ownership to Switch Vision Hub.
+- Removes the duplicate UniFi2MQTT configuration form from the Installer.
+- Removes Installer-only UniFi configuration API endpoints and secret-handling code.
+- Keeps UniFi2MQTT repository registration, installation, status reporting, and restart controls in the Installer.
+- Directs users to Switch Vision Hub after installing UniFi2MQTT.
+- Keeps UniFi2MQTT optional for installations that do not use UniFi switches.
+
 ## v2.1.1
 
 - Adds an in-Installer UniFi2MQTT configuration card.
