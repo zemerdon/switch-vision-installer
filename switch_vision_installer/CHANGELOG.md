@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.1.1
+
+- Adds an in-Installer UniFi2MQTT configuration card.
+- Validates controller URL, Site ID, API key, MQTT host, port, polling interval, and topic prefixes before start.
+- Saves UniFi2MQTT options through Home Assistant Supervisor and starts or restarts the add-on automatically.
+- Never returns stored API keys or MQTT passwords to the browser; blank secret fields preserve existing saved secrets.
+- Shows whether an API key or MQTT password is already saved without exposing its value.
+- Keeps UniFi2MQTT optional for installations that do not use UniFi switches.
+
 ## v2.1.0
 
 - Adds optional Switch Vision UniFi2MQTT management to the Installer.

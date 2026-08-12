@@ -170,3 +170,15 @@ body.density-compact .collapsible-card>summary{padding:9px 10px}
 body.density-compact .collapsible-content{padding:0 10px 9px}
 body.density-dense .collapsible-card>summary{padding:6px 7px}
 body.density-dense .collapsible-content{padding:0 7px 6px}
+
+.config-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:10px 0}
+.config-grid label{display:flex;flex-direction:column;gap:5px;color:#aabbd0;font-size:var(--sv-small)}
+.config-grid label>span{font-weight:700;color:#c7d6e7}
+.config-grid input{width:100%;border:1px solid #294867;border-radius:8px;background:#07101d;color:#eaf2ff;padding:9px 10px;font:inherit;outline:none}
+.config-grid input:focus{border-color:#55a8ff;box-shadow:0 0 0 2px #1678db33}
+.config-grid input[type="checkbox"]{width:auto;accent-color:#2f8dff}
+.config-grid .checkbox-label{flex-direction:row;align-items:center;align-self:end;min-height:40px}
+.config-grid small{color:#7f97b0}
+.config-actions{margin-top:4px}
+.config-state{margin:8px 0 0;padding:7px 9px;border-radius:8px;background:#0a1625;color:#9fb4ca;font-size:var(--sv-small)}
+@media(max-width:720px){.config-grid{grid-template-columns:1fr}}

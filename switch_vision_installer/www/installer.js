@@ -15,7 +15,7 @@ async function loadUiPreferences(){
   catch(error){console.warn('Using default Installer UI preferences:',error);applyUiPreferences();}
 }
 const $=id=>document.getElementById(id); let currentStatus=null,currentRelease=null,backups=[],pollTimer=null;
-const COLLAPSIBLE_SECTIONS=['readiness-section','activity-section','backups-section'];
+const COLLAPSIBLE_SECTIONS=['unifi-config-section','readiness-section','activity-section','backups-section'];
 let activityRestoreState=null;
 function initialiseCollapsibleSections(){
   for(const id of COLLAPSIBLE_SECTIONS){
@@ -72,13 +72,69 @@ function renderComponents(s){const discovery=addonState({files:s.discovery_prese
 
 function renderGuidance(){const s=currentStatus||{},steps=[];if(!s.component_present||!s.frontend_present)steps.push('Install Switch Vision Core and dashboard files.');if(!s.discovery_installed)steps.push(s.discovery_available?'Install the Discovery add-on using the button below.':'Run the main installation so Discovery becomes available.');if(!s.snmp2mqtt_installed)steps.push(s.snmp2mqtt_available?'Install the SNMP2MQTT add-on using the button below.':'Run the main installation so SNMP2MQTT becomes available.');const el=$('first-run');if(steps.length){el.classList.remove('hidden');el.innerHTML=`<b>First-run guidance</b><ol>${steps.map(x=>`<li>${esc(x)}</li>`).join('')}</ol>`;}else{el.classList.add('hidden');el.innerHTML='';}}
 function renderChecklist(){const s=currentStatus||{},items=[['Core installed',s.component_present],['Dashboard frontend installed',s.frontend_present],['Discovery installed',s.discovery_installed],['SNMP2MQTT installed',s.snmp2mqtt_installed],['Generated SNMP2MQTT YAML present',s.snmp2mqtt_generated_yaml],['Recovery backup available',backups.length>0]];$('checklist').innerHTML=items.map(([label,ok])=>`<div class="check-item ${ok?'pass':'pending'}"><span>${ok?'✓':'○'}</span><b>${esc(label)}</b></div>`).join('');}
+
+async function loadUniFiConfig(){
+  const section=$('unifi-config-section');
+  if(!currentStatus?.unifi2mqtt_installed){section.classList.add('hidden');return;}
+  section.classList.remove('hidden');
+  try{
+    const data=await json('api/unifi2mqtt-config');
+    const o=data.options||{};
+    $('unifi-controller-url').value=o.controller_url||'';
+    $('unifi-site-id').value=o.site_id||'';
+    $('unifi-verify-ssl').checked=!!o.verify_ssl;
+    $('unifi-poll-interval').value=o.poll_interval??30;
+    $('unifi-mqtt-host').value=o.mqtt_host||'core-mosquitto';
+    $('unifi-mqtt-port').value=o.mqtt_port??1883;
+    $('unifi-mqtt-username').value=o.mqtt_username||'';
+    $('unifi-mqtt-topic-prefix').value=o.mqtt_topic_prefix||'switch_vision/unifi';
+    $('unifi-mqtt-discovery-prefix').value=o.mqtt_discovery_prefix||'homeassistant';
+    $('unifi-api-key').value='';
+    $('unifi-mqtt-password').value='';
+    $('unifi-api-key').placeholder=data.api_key_set?'Saved — leave blank to keep':'Enter API key';
+    $('unifi-mqtt-password').placeholder=data.mqtt_password_set?'Saved — leave blank to keep':'Optional';
+    $('unifi-api-key-status').textContent=data.api_key_set?'API key saved':'API key not saved';
+    $('unifi-mqtt-password-status').textContent=data.mqtt_password_set?'MQTT password saved':'MQTT password not saved';
+    $('unifi-config-state').textContent=`UniFi2MQTT state: ${data.state||'unknown'}`;
+  }catch(e){
+    $('unifi-config-state').textContent=`Unable to load UniFi2MQTT configuration: ${e.message}`;
+  }
+}
+
+async function saveStartUniFi(){
+  const button=$('save-start-unifi2mqtt');
+  button.disabled=true;
+  const payload={
+    controller_url:$('unifi-controller-url').value,
+    site_id:$('unifi-site-id').value,
+    api_key:$('unifi-api-key').value,
+    verify_ssl:$('unifi-verify-ssl').checked,
+    poll_interval:$('unifi-poll-interval').value,
+    mqtt_host:$('unifi-mqtt-host').value,
+    mqtt_port:$('unifi-mqtt-port').value,
+    mqtt_username:$('unifi-mqtt-username').value,
+    mqtt_password:$('unifi-mqtt-password').value,
+    mqtt_topic_prefix:$('unifi-mqtt-topic-prefix').value,
+    mqtt_discovery_prefix:$('unifi-mqtt-discovery-prefix').value,
+  };
+  try{
+    const r=await json('api/configure-unifi2mqtt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    showResult(`<h3>UniFi2MQTT configured</h3><p>${esc(r.message||'Configuration saved.')}</p><p><b>State:</b> ${esc(r.state||'unknown')}</p>`,'success');
+    await refresh(false);
+  }catch(e){
+    showResult(`UniFi2MQTT configuration failed: ${esc(e.message)}`,'error');
+  }finally{
+    button.disabled=false;
+  }
+}
+
 function compare(a,b){const pa=String(a||'').split('.').map(Number),pb=String(b||'').split('.').map(Number);for(let i=0;i<Math.max(pa.length,pb.length);i++){const d=(pa[i]||0)-(pb[i]||0);if(d)return d;}return 0;}
 function renderState(){const installed=currentStatus?.installed_version,latest=currentRelease?.version;$('installed').textContent=installed?`v${installed}`:'Not installed';$('latest').textContent=latest?`v${latest}`:'Unavailable';$('show-changelog').disabled=!latest;$('installer').textContent=`v${currentStatus?.installer_version||'1.9.10'}`;renderComponents(currentStatus||{});renderGuidance();renderChecklist();$('backup-location').textContent=`Backup location: ${currentStatus?.backup_path||'/share/switch-vision-backups/'}`;$('backup-retention').textContent=`Retention: newest ${currentStatus?.backup_retention||5} backups`;$('asset').textContent=currentRelease?.asset_name||'—';$('asset-size').textContent=fmtBytes(currentRelease?.asset_size);$('published').textContent=fmtDate(currentRelease?.published_at);const btn=$('install'),dry=$('dry-run'),badge=$('state-badge');dry.disabled=!latest;badge.className='badge';if(!latest){$('state-title').textContent='Release check unavailable';$('state-copy').textContent='The installer could not retrieve the latest public release.';badge.textContent='Unavailable';badge.classList.add('warn');btn.disabled=true;return;}if(!installed){$('state-title').textContent='Ready to install';$('state-copy').textContent=`Switch Vision v${latest} is available for first-time installation.`;badge.textContent='Not installed';badge.classList.add('warn');btn.textContent='Install Switch Vision';btn.disabled=false;return;}const c=compare(installed,latest);if(c<0){$('state-title').textContent='Update available';$('state-copy').textContent=`Switch Vision v${latest} is ready to replace v${installed}.`;badge.textContent='Update available';badge.classList.add('warn');btn.textContent=`Update to v${latest}`;btn.disabled=false;}else if(c===0){$('state-title').textContent='Switch Vision is up to date';$('state-copy').textContent='The installed version matches the latest public release.';badge.textContent='Up to date';badge.classList.add('okb');btn.textContent=`Reinstall v${latest}`;btn.disabled=false;}else{$('state-title').textContent='Installed version is newer';$('state-copy').textContent=`Installed v${installed}; latest public release is v${latest}.`;badge.textContent='Newer local build';badge.classList.add('neutral');btn.textContent=`Install public v${latest}`;btn.disabled=false;}}
 function selectedBackup(){return backups.find(b=>b.name===$('backups').value);}
 function renderBackupMeta(){const b=selectedBackup();$('validate-backup').disabled=!b;$('restore').disabled=!b;$('delete-backup').disabled=!b;$('backup-meta').innerHTML=b?`<b>${esc(b.name)}</b><br>Created: ${esc(fmtDate(b.created_at))}<br>Version: ${b.version?`v${esc(b.version)}`:'Unknown'}<br>Contains: ${esc((b.contents||[]).join(', ')||'Unknown')}<br>SNMP2MQTT options: ${b.snmp2mqtt_configuration_saved?'Saved':'Not saved'}<br>Generated YAML: ${b.snmp2mqtt_generated_yaml_saved?'Saved':'Not saved'}${b.legacy_location?'<br><b>Location:</b> Legacy backup folder':''}`:'No backup selected.';}
 async function loadBackups(){const d=await json('api/backups');backups=d.backups||[];const sel=$('backups');sel.innerHTML=backups.length?backups.map(b=>`<option value="${esc(b.name)}">${esc(b.name)}${b.version?` — v${esc(b.version)}`:''}</option>`).join(''):'<option value="">No backups found</option>';renderBackupMeta();renderChecklist();}
 function resultSummary(r){if(r.backup_created){return`<h3>Backup created successfully</h3><p><b>Backup:</b> ${esc(r.backup)}</p><p><b>Location:</b> <code>${esc(r.backup_path||'')}</code></p><p><b>Status:</b> ${r.verified?'Verified':'Not verified'}</p><p><b>Files checked:</b> ${esc(r.file_count||0)}</p>${r.version?`<p><b>Switch Vision version:</b> v${esc(r.version)}</p>`:''}${Number.isFinite(Number(r.configured_switches))?`<p><b>Discovery switches saved:</b> ${esc(r.configured_switches)}</p>`:''}`;}if(r.backup_validated){return`<h3>Backup validation passed</h3><p><b>Backup:</b> ${esc(r.backup)}</p><p><b>Status:</b> Verified</p><p><b>Files checked:</b> ${esc(r.file_count||0)}</p>`;}if(r.dry_run){const changes=(r.would_change||[]).map(x=>`<li>${esc(x)}</li>`).join(''),unchanged=(r.unchanged||[]).map(x=>`<li>${esc(x)}</li>`).join(''),preserve=(r.would_preserve||[]).map(x=>`<li>${esc(x)}</li>`).join(''),checks=(r.preflight||[]).map(x=>`<li><b>${esc(x.name)}:</b> ${x.ok?'Pass':'Advisory'} — ${esc(x.detail)}</li>`).join('');return`<h3>Dry run completed</h3><p>No files or settings were changed.</p><p><b>Target:</b> v${esc(r.version)}</p><p><b>SHA-256:</b> <code>${esc(r.checksum)}</code>${r.checksum_verified?' (verified against published checksum)':' (computed; no published checksum asset found)'}</p>${changes?`<p><b>Would change:</b></p><ul>${changes}</ul>`:'<p>No managed components would change.</p>'}${unchanged?`<p><b>Already current:</b></p><ul>${unchanged}</ul>`:''}${preserve?`<p><b>Would preserve:</b></p><ul>${preserve}</ul>`:''}<p><b>Backup:</b> ${r.would_create_backup?'Would be created and validated':'Not required'}</p>${checks?`<p><b>Preflight checks:</b></p><ul>${checks}</ul>`:''}`;}const installed=(r.installed||r.restored||[]).map(x=>`<li>${esc(x)}</li>`).join(''),unchanged=(r.unchanged||[]).map(x=>`<li>${esc(x)}</li>`).join(''),preserved=(r.preserved||[]).map(x=>`<li>${esc(x)}</li>`).join(''),actions=(r.required_actions||[]).map(x=>`<li>${esc(x)}</li>`).join('');return`<h3>${r.restored?'Backup restored':'Operation completed successfully'}</h3>${r.version?`<p><b>Version:</b> v${esc(r.version)}</p>`:''}${r.backup?`<p><b>Backup:</b> ${esc(r.backup)}</p>`:''}${r.checksum?`<p><b>SHA-256:</b> <code>${esc(r.checksum)}</code></p>`:''}${installed?`<p><b>${r.restored?'Restored':'Changed'}:</b></p><ul>${installed}</ul>`:'<p>No managed component files required replacement.</p>'}${unchanged?`<p><b>Already current:</b></p><ul>${unchanged}</ul>`:''}${preserved?`<p><b>Preserved custom assets:</b></p><ul>${preserved}</ul>`:''}${actions?`<p><b>Required next steps:</b></p><ol>${actions}</ol>`:''}`;}
-async function refresh(showLast=true){setControls(true);try{[currentStatus,currentRelease]=await Promise.all([json('api/status'),json('api/latest')]);renderState();await loadBackups();if(showLast&&currentStatus.last_result)showResult(resultSummary(currentStatus.last_result),'success');else if(showLast)showResult('Ready.','muted');}catch(e){showResult(`Unable to check releases: ${esc(e.message)}`,'error');}finally{setControls(false);renderState();}}
+async function refresh(showLast=true){setControls(true);try{[currentStatus,currentRelease]=await Promise.all([json('api/status'),json('api/latest')]);renderState();await loadBackups();await loadUniFiConfig();if(showLast&&currentStatus.last_result)showResult(resultSummary(currentStatus.last_result),'success');else if(showLast)showResult('Ready.','muted');}catch(e){showResult(`Unable to check releases: ${esc(e.message)}`,'error');}finally{setControls(false);renderState();}}
 async function pollOperation(){openActivitySection();clearInterval(pollTimer);$('progress').classList.remove('hidden');$('progress-text').classList.remove('hidden');setControls(true);pollTimer=setInterval(async()=>{try{const op=await json('api/operation');$('progress-bar').style.width=`${op.percent||0}%`;$('progress-text').textContent=op.message||'Working…';$('progress-stage').classList.remove('hidden');$('progress-stage').textContent=`${esc(op.kind||'operation')} — ${op.percent||0}%`;if(!op.active){clearInterval(pollTimer);restoreActivitySection();$('progress').classList.add('hidden');$('progress-text').classList.add('hidden');$('progress-stage').classList.add('hidden');if(op.error)showResult(`Operation failed: ${esc(op.error)}`,'error');else if(op.result){showResult(resultSummary(op.result),'success');}await refresh(false);}}catch(e){clearInterval(pollTimer);restoreActivitySection();showResult(`Unable to read operation status: ${esc(e.message)}`,'error');setControls(false);}},700);}
 $('show-changelog').addEventListener('click',()=>toggleChangelog(true));$('close-changelog').addEventListener('click',()=>toggleChangelog(false));
 $('check').addEventListener('click',()=>refresh(false));$('backups').addEventListener('change',renderBackupMeta);
@@ -92,9 +148,10 @@ $('delete-backup').addEventListener('click',async()=>{const b=selectedBackup();i
 
 $('install-discovery').addEventListener('click',async()=>{const button=$('install-discovery');button.disabled=true;try{await json('api/install-discovery',{method:'POST'});showResult('Discovery add-on installation requested. Refreshing status shortly…','success');setTimeout(()=>refresh(false),4000);}catch(e){button.disabled=false;showResult(`Discovery install failed: ${esc(e.message)}`,'error');}});
 $('install-snmp2mqtt').addEventListener('click',async()=>{const button=$('install-snmp2mqtt');button.disabled=true;try{await json('api/install-snmp2mqtt',{method:'POST'});showResult('SNMP2MQTT add-on installation requested. Refreshing status shortly…','success');setTimeout(()=>refresh(false),4000);}catch(e){button.disabled=false;showResult(`SNMP2MQTT install failed: ${esc(e.message)}`,'error');}});
-$('install-unifi2mqtt').addEventListener('click',async()=>{const button=$('install-unifi2mqtt');button.disabled=true;try{await json('api/install-unifi2mqtt',{method:'POST'});showResult('UniFi2MQTT add-on installation requested. Refreshing status shortly…','success');setTimeout(()=>refresh(false),4000);}catch(e){button.disabled=false;showResult(`UniFi2MQTT install failed: ${esc(e.message)}`,'error');}});
+$('install-unifi2mqtt').addEventListener('click',async()=>{const button=$('install-unifi2mqtt');button.disabled=true;try{await json('api/install-unifi2mqtt',{method:'POST'});showResult('UniFi2MQTT add-on installed. Configure it below before starting.','success');setTimeout(()=>refresh(false),2500);}catch(e){button.disabled=false;showResult(`UniFi2MQTT install failed: ${esc(e.message)}`,'error');}});
 $('restart-core').addEventListener('click',async()=>{if(!confirm('Restart Home Assistant Core now?'))return;const button=$('restart-core');button.disabled=true;try{await json('api/restart-core',{method:'POST'});showResult('Home Assistant Core restart requested. This page may temporarily disconnect.','success');}catch(e){button.disabled=false;showResult(`Core restart failed: ${esc(e.message)}`,'error');}});
 $('restart-discovery').addEventListener('click',async()=>{const button=$('restart-discovery');button.disabled=true;try{await json('api/restart-discovery',{method:'POST'});showResult('Discovery add-on restart requested.','success');setTimeout(()=>{button.disabled=false;},5000);}catch(e){button.disabled=false;showResult(`Discovery restart failed: ${esc(e.message)}`,'error');}});
+$('save-start-unifi2mqtt').addEventListener('click',saveStartUniFi);
 initialiseCollapsibleSections();
 loadUiPreferences().finally(()=>refresh());
 
