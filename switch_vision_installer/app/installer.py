@@ -16,7 +16,7 @@ import urllib.error
 import zipfile
 import re
 
-INSTALLER_VERSION = "2.1.2"
+INSTALLER_VERSION = "2.1.3"
 OPTIONS_PATH = Path(os.environ.get("SV_INSTALLER_OPTIONS", "/data/options.json"))
 STATE_PATH = Path(os.environ.get("SV_INSTALLER_STATE", "/data/state.json"))
 WORK_DIR = Path(os.environ.get("SV_INSTALLER_WORK", "/data/work"))
@@ -210,7 +210,7 @@ def update_discovery_after_install(expected_version: str, progress: Progress | N
     if progress:
         progress(f"Updating Discovery to v{expected}…", 90)
     supervisor_request(
-        f"/store/addons/{slug}/update",
+        f"/addons/{slug}/update",
         method="POST",
         payload={"backup": False, "background": False},
     )
@@ -1018,18 +1018,20 @@ def install_release(root: Path, version: str, checksum: str, progress: Progress 
                 rollback_note = f" Automatic rollback also failed: {rollback_exc}"
         raise RuntimeError(f"Installation failed: {exc}.{rollback_note}") from exc
     discovery_runtime: dict[str, Any] | None = None
-    if "Discovery add-on" in installed:
-        expected_discovery_version = read_packaged_app_version(root / "local_apps" / "switch_vision_discovery")
+    packaged_discovery = root / "local_apps" / "switch_vision_discovery"
+    if packaged_discovery.is_dir():
+        expected_discovery_version = read_packaged_app_version(packaged_discovery)
         try:
             discovery_runtime = update_discovery_after_install(expected_discovery_version, progress)
         except Exception as exc:
             raise RuntimeError(
-                "Switch Vision files were installed, but Discovery could not be updated and verified automatically: "
-                f"{exc}. Open the Discovery app, run its offered update, and confirm it reports v{expected_discovery_version}."
+                "Switch Vision files were installed, but the running Discovery app could not be reconciled "
+                f"to v{expected_discovery_version}: {exc}. Open the Discovery app, run its offered update, "
+                f"and confirm it reports v{expected_discovery_version}."
             ) from exc
         if discovery_runtime.get("installed") and normalise_version(discovery_runtime.get("version")) != expected_discovery_version:
             raise RuntimeError(
-                f"Discovery version verification failed: expected v{expected_discovery_version}, "
+                f"Discovery runtime version verification failed: expected v{expected_discovery_version}, "
                 f"received v{discovery_runtime.get('version') or 'unknown'}."
             )
 
@@ -1039,11 +1041,11 @@ def install_release(root: Path, version: str, checksum: str, progress: Progress 
         warnings.append("Generated SNMP2MQTT YAML was not found at /share/switch_vision/generated-snmp2mqtt.yaml.")
     actions=[]
     if "Custom component" in installed: actions.append("Restart Home Assistant Core")
-    if "Discovery add-on" in installed:
-        if discovery_runtime and discovery_runtime.get("installed"):
+    if discovery_runtime and discovery_runtime.get("installed"):
+        if "Discovery add-on" in installed or bool(discovery_runtime.get("updated")):
             actions.append("Run Switch Vision Discovery")
-        else:
-            actions.extend(["Install Switch Vision Discovery", "Run Switch Vision Discovery"])
+    elif "Discovery add-on" in installed:
+        actions.extend(["Install Switch Vision Discovery", "Run Switch Vision Discovery"])
     if "SNMP2MQTT add-on" in installed: actions.extend(["Rebuild or reinstall Switch Vision SNMP2MQTT", "Restart Switch Vision SNMP2MQTT"])
     if "Dashboard frontend and visual assets" in installed: actions.append("Hard-refresh the browser if older frontend content remains")
     result = InstallResult(True, version, str(backup) if backup else None, installed, unchanged, preserved, warnings, actions, checksum, datetime.now(timezone.utc).isoformat())

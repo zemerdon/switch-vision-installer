@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.1.3
+
+- Reconciles the running Switch Vision Discovery app with the Discovery version bundled in every Switch Vision install or reinstall.
+- Fixes the Supervisor update endpoint used for Discovery updates.
+- Repairs the partial-update case where current Discovery files exist in `/addons` but an older Discovery container is still running.
+- Verifies the running Discovery version after update before reporting installation success.
+- Preserves existing Discovery configuration while updating the app runtime.
+
 ## v2.1.2
 
 - Moves UniFi2MQTT credentials and runtime configuration ownership to Switch Vision Hub.
