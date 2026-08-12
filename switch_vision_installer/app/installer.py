@@ -16,7 +16,7 @@ import urllib.error
 import zipfile
 import re
 
-INSTALLER_VERSION = "2.0.1"
+INSTALLER_VERSION = "2.1.0"
 OPTIONS_PATH = Path(os.environ.get("SV_INSTALLER_OPTIONS", "/data/options.json"))
 STATE_PATH = Path(os.environ.get("SV_INSTALLER_STATE", "/data/state.json"))
 WORK_DIR = Path(os.environ.get("SV_INSTALLER_WORK", "/data/work"))
@@ -29,6 +29,7 @@ COMPONENT_DIR = HA_CONFIG / "custom_components" / "switch_vision"
 FRONTEND_DIR = HA_CONFIG / "www" / "switch-vision"
 DISCOVERY_DIR = ADDONS_DIR / "switch_vision_discovery"
 SNMP2MQTT_DIR = ADDONS_DIR / "switch_vision_snmp2mqtt"
+UNIFI2MQTT_DIR = ADDONS_DIR / "switch_vision_unifi2mqtt"
 SHARE_DIR = Path("/share")
 GENERATED_SNMP2MQTT_YAML = SHARE_DIR / "switch_vision" / "generated-snmp2mqtt.yaml"
 
@@ -380,6 +381,80 @@ def snmp2mqtt_status() -> dict[str, Any]:
     }
 
 
+def find_unifi2mqtt_slug(include_store: bool = False) -> str:
+    addon = _find_addon(
+        lambda slug, name: (
+            "switch_vision_unifi2mqtt" in slug
+            or "switch-vision-unifi2mqtt" in slug
+            or name == "switch vision unifi2mqtt"
+            or ("switch vision" in name and "unifi2mqtt" in name)
+        ),
+        include_store=include_store,
+    )
+    if addon:
+        return str(addon.get("slug", ""))
+    raise RuntimeError("Switch Vision UniFi2MQTT add-on was not found by Supervisor.")
+
+
+def get_unifi2mqtt_info() -> dict[str, Any] | None:
+    try:
+        slug = find_unifi2mqtt_slug()
+        info = supervisor_request(f"/addons/{slug}/info")
+        data = info.get("data", {})
+        return data if isinstance(data, dict) else None
+    except Exception:
+        return None
+
+
+def get_unifi2mqtt_options() -> dict[str, Any] | None:
+    info = get_unifi2mqtt_info()
+    options = info.get("options") if isinstance(info, dict) else None
+    return options if isinstance(options, dict) else None
+
+
+def set_unifi2mqtt_options(options: dict[str, Any]) -> None:
+    slug = find_unifi2mqtt_slug()
+    supervisor_request(f"/addons/{slug}/options", method="POST", payload={"options": options})
+
+
+def unifi2mqtt_status() -> dict[str, Any]:
+    match = lambda slug, name: (
+        "switch_vision_unifi2mqtt" in slug
+        or "switch-vision-unifi2mqtt" in slug
+        or name == "switch vision unifi2mqtt"
+        or ("switch vision" in name and "unifi2mqtt" in name)
+    )
+    installed_addon = _find_addon(match, include_store=False)
+    store_addon = _find_addon(match, include_store=True)
+    if installed_addon:
+        slug = str(installed_addon.get("slug", ""))
+        try:
+            info_payload = supervisor_request(f"/addons/{slug}/info")
+            info = info_payload.get("data", {})
+        except Exception:
+            info = installed_addon
+        return {
+            "present": UNIFI2MQTT_DIR.is_dir(),
+            "available": True,
+            "installed": True,
+            "slug": slug,
+            "version": info.get("version") or info.get("version_latest") or installed_addon.get("version"),
+            "state": info.get("state") or installed_addon.get("state") or "unknown",
+            "ingress_entry": info.get("ingress_entry") or installed_addon.get("ingress_entry"),
+            "webui": info.get("webui") or installed_addon.get("webui"),
+        }
+    return {
+        "present": UNIFI2MQTT_DIR.is_dir(),
+        "available": bool(store_addon) or UNIFI2MQTT_DIR.is_dir(),
+        "installed": False,
+        "slug": str(store_addon.get("slug", "")) if store_addon else None,
+        "version": (store_addon.get("version") or store_addon.get("version_latest")) if store_addon else None,
+        "state": "not_installed",
+        "ingress_entry": None,
+        "webui": None,
+    }
+
+
 def reload_addon_store() -> None:
     errors: list[str] = []
     for endpoint in ("/addons/reload", "/store/reload"):
@@ -397,6 +472,8 @@ def install_supervisor_addon(kind: str) -> dict[str, Any]:
         slug = find_discovery_slug(include_store=True)
     elif kind == "snmp2mqtt":
         slug = find_snmp2mqtt_slug(include_store=True)
+    elif kind == "unifi2mqtt":
+        slug = find_unifi2mqtt_slug(include_store=True)
     else:
         raise RuntimeError(f"Unsupported add-on kind: {kind}")
     try:
@@ -1041,6 +1118,7 @@ def status() -> dict[str, Any]:
         except (OSError, json.JSONDecodeError): pass
     discovery = discovery_status()
     snmp = snmp2mqtt_status()
+    unifi = unifi2mqtt_status()
     return {
         "installer_version": INSTALLER_VERSION,
         "installed_version": installed_version(),
@@ -1065,6 +1143,15 @@ def status() -> dict[str, Any]:
         "snmp2mqtt_webui": snmp.get("webui"),
         "snmp2mqtt_details_path": f"/config/app/{snmp.get('slug')}/info" if snmp.get("slug") else None,
         "snmp2mqtt_generated_yaml": bool(snmp.get("generated_yaml")),
+        "unifi2mqtt_present": bool(unifi.get("present")),
+        "unifi2mqtt_available": bool(unifi.get("available")),
+        "unifi2mqtt_slug": unifi.get("slug"),
+        "unifi2mqtt_installed": bool(unifi.get("installed")),
+        "unifi2mqtt_version": unifi.get("version"),
+        "unifi2mqtt_state": unifi.get("state"),
+        "unifi2mqtt_ingress_entry": unifi.get("ingress_entry"),
+        "unifi2mqtt_webui": unifi.get("webui"),
+        "unifi2mqtt_details_path": f"/config/app/{unifi.get('slug')}/info" if unifi.get("slug") else None,
         "backup_path": str(BACKUP_DIR),
         "backup_retention": max(1, int(load_options().get("backup_retention", 5))),
         "last_result": state,

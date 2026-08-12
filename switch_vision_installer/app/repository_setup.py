@@ -6,6 +6,7 @@ import time
 import installer as installer_core
 
 SNMP2MQTT_REPOSITORY = "https://github.com/zemerdon/switch-vision-snmp2mqtt-addon"
+UNIFI2MQTT_REPOSITORY = "https://github.com/zemerdon/switch-vision-unifi2mqtt"
 Progress = Callable[[str, int], None]
 
 
@@ -82,5 +83,61 @@ def ensure_snmp2mqtt_repository(progress: Progress | None = None) -> dict[str, A
         "available": True,
         "slug": slug,
         "repository": SNMP2MQTT_REPOSITORY,
+    }
+
+def _repository_entry_for(repository: str) -> dict[str, Any] | None:
+    expected = _normalise_repo_url(repository)
+    for item in _repository_list():
+        for key in ("source", "url"):
+            if _normalise_repo_url(item.get(key)) == expected:
+                return item
+    return None
+
+
+def _wait_for_unifi2mqtt(timeout: int = 120) -> str:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            return installer_core.find_unifi2mqtt_slug(include_store=True)
+        except Exception:
+            time.sleep(2)
+    raise RuntimeError(
+        "Switch Vision UniFi2MQTT repository is registered, but the app did not become available "
+        "in the Home Assistant store within 120 seconds."
+    )
+
+
+def ensure_unifi2mqtt_repository(progress: Progress | None = None) -> dict[str, Any]:
+    try:
+        slug = installer_core.find_unifi2mqtt_slug(include_store=True)
+        return {"added": False, "available": True, "slug": slug, "repository": UNIFI2MQTT_REPOSITORY}
+    except Exception:
+        pass
+
+    existing = _repository_entry_for(UNIFI2MQTT_REPOSITORY)
+    added = False
+    if existing is None:
+        if progress:
+            progress("Adding the Switch Vision UniFi2MQTT App repository…", 3)
+        try:
+            installer_core.supervisor_request(
+                "/store/repositories",
+                method="POST",
+                payload={"repository": UNIFI2MQTT_REPOSITORY},
+            )
+            added = True
+        except Exception:
+            if _repository_entry_for(UNIFI2MQTT_REPOSITORY) is None:
+                raise
+
+    if progress:
+        progress("Refreshing the Home Assistant App store…", 4)
+    installer_core.reload_addon_store()
+    slug = _wait_for_unifi2mqtt()
+    return {
+        "added": added,
+        "available": True,
+        "slug": slug,
+        "repository": UNIFI2MQTT_REPOSITORY,
     }
 

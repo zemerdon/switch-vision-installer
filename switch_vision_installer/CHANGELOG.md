@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.1.0
+
+- Adds optional Switch Vision UniFi2MQTT management to the Installer.
+- Registers the official `switch-vision-unifi2mqtt` Home Assistant App repository on demand.
+- Installs UniFi2MQTT through Home Assistant Supervisor from the Installer UI.
+- Detects and reports UniFi2MQTT availability, installed version, and runtime state.
+- Adds manual Install and Restart UniFi2MQTT recovery actions.
+- Keeps UniFi2MQTT optional so non-UniFi Switch Vision installations are not blocked.
+- Updates the Installer Home Assistant map declaration from legacy `addons` to `local_apps`.
+
 ## v2.0.1
 
 - Automatically installs Switch Vision Discovery when the main installation finds it missing.

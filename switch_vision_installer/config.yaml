@@ -1,5 +1,5 @@
 name: Switch Vision Installer
-version: "2.0.1"
+version: "2.1.0"
 slug: switch_vision_installer
 description: Install and update Switch Vision from the official public release repository.
 url: https://github.com/zemerdon/switch-vision-installer
@@ -19,7 +19,7 @@ hassio_role: manager
 map:
   - type: homeassistant_config
     read_only: false
-  - type: addons
+  - type: local_apps
     read_only: false
   - type: share
     read_only: false

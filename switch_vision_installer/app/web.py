@@ -8,8 +8,8 @@ import installer as installer_core
 INSTALLER_VERSION = str(os.environ.get("SV_INSTALLER_VERSION") or installer_core.INSTALLER_VERSION).strip()
 installer_core.INSTALLER_VERSION = INSTALLER_VERSION
 
-from installer import apply_backup_retention, create_manual_backup, delete_backup, discovery_status, download_and_install, dry_run, find_discovery_slug, find_snmp2mqtt_slug, install_supervisor_addon, latest_release, list_backups, load_options, restore_backup, snmp2mqtt_status, status, validate_named_backup
-from repository_setup import ensure_snmp2mqtt_repository
+from installer import apply_backup_retention, create_manual_backup, delete_backup, discovery_status, download_and_install, dry_run, find_discovery_slug, find_snmp2mqtt_slug, find_unifi2mqtt_slug, install_supervisor_addon, latest_release, list_backups, load_options, restore_backup, snmp2mqtt_status, status, unifi2mqtt_status, validate_named_backup
+from repository_setup import ensure_snmp2mqtt_repository, ensure_unifi2mqtt_repository
 
 WEB_ROOT = Path(os.environ.get("SV_INSTALLER_WEB", "/opt/switch-vision-installer/www"))
 UI_PREFERENCES_PATH = Path(os.environ.get("SV_UI_PREFERENCES", "/share/switch_vision/ui-preferences.json"))
@@ -227,6 +227,13 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json({"ok":True,"requested":True,**result})
             if path=="/api/restart-snmp2mqtt":
                 result = supervisor_request(f"/addons/{find_snmp2mqtt_slug()}/restart")
+                return self.send_json({"ok":True,"requested":True,"supervisor":result})
+            if path=="/api/install-unifi2mqtt":
+                ensure_unifi2mqtt_repository()
+                result = install_supervisor_addon("unifi2mqtt")
+                return self.send_json({"ok":True,"requested":True,**result})
+            if path=="/api/restart-unifi2mqtt":
+                result = supervisor_request(f"/addons/{find_unifi2mqtt_slug()}/restart")
                 return self.send_json({"ok":True,"requested":True,"supervisor":result})
             self.send_error(404)
         except Exception as exc: traceback.print_exc(); self.send_json({"ok":False,"error":str(exc)},500)
