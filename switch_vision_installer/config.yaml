@@ -1,5 +1,5 @@
 name: Switch Vision Installer
-version: "2.1.3"
+version: "2.1.4"
 slug: switch_vision_installer
 description: Install and update Switch Vision from the official public release repository.
 url: https://github.com/zemerdon/switch-vision-installer

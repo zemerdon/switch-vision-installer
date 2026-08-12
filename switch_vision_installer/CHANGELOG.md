@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.1.4
+
+- Refreshes both Supervisor app metadata and store metadata before deciding Discovery is stale.
+- Uses the current Supervisor store endpoint for normal Discovery updates.
+- Adds automatic stale-runtime recovery when newer Discovery files are present but Supervisor still reports the old version.
+- Preserves Discovery options, removes the stale runtime without deleting its configuration, reinstalls Discovery, restores options, starts it, and verifies the expected version.
+- Reduces the stale metadata wait before recovery so failed version reconciliation does not stall unnecessarily.
+
 ## v2.1.3
 
 - Reconciles the running Switch Vision Discovery app with the Discovery version bundled in every Switch Vision install or reinstall.

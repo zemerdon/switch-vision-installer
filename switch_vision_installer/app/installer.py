@@ -16,7 +16,7 @@ import urllib.error
 import zipfile
 import re
 
-INSTALLER_VERSION = "2.1.3"
+INSTALLER_VERSION = "2.1.4"
 OPTIONS_PATH = Path(os.environ.get("SV_INSTALLER_OPTIONS", "/data/options.json"))
 STATE_PATH = Path(os.environ.get("SV_INSTALLER_STATE", "/data/state.json"))
 WORK_DIR = Path(os.environ.get("SV_INSTALLER_WORK", "/data/work"))
@@ -147,13 +147,84 @@ def wait_for_addon(slug: str, *, expected_version: str | None = None, expected_s
 
 def refresh_local_app_metadata() -> None:
     errors: list[str] = []
+    successes = 0
     for endpoint in ("/addons/reload", "/store/reload"):
         try:
             supervisor_request(endpoint, method="POST")
-            return
+            successes += 1
         except Exception as exc:
             errors.append(f"{endpoint}: {exc}")
-    raise RuntimeError("Unable to refresh Home Assistant app metadata: " + "; ".join(errors))
+    if successes == 0:
+        raise RuntimeError("Unable to refresh Home Assistant app metadata: " + "; ".join(errors))
+
+
+def recover_stale_discovery_runtime(
+    slug: str,
+    expected_version: str,
+    progress: Progress | None = None,
+) -> dict[str, Any]:
+    expected = normalise_version(expected_version)
+    preserved_options = get_discovery_options()
+
+    try:
+        before = addon_info(slug)
+    except Exception:
+        before = {}
+
+    if str(before.get("state") or "").lower() == "started":
+        if progress:
+            progress("Stopping stale Discovery runtime…", 88)
+        supervisor_request(f"/addons/{slug}/stop", method="POST")
+        wait_for_addon(slug, expected_state="stopped", timeout=120)
+
+    if progress:
+        progress("Removing stale Discovery runtime…", 90)
+    supervisor_request(
+        f"/addons/{slug}/uninstall",
+        method="POST",
+        payload={"remove_config": False},
+    )
+
+    if progress:
+        progress("Reloading Discovery app metadata…", 92)
+    refresh_local_app_metadata()
+
+    if progress:
+        progress(f"Installing Discovery v{expected}…", 94)
+    install_result = install_supervisor_addon("discovery")
+    new_slug = str(install_result.get("slug") or slug)
+
+    installed = wait_for_addon(
+        new_slug,
+        expected_version=expected,
+        timeout=900,
+    )
+
+    if preserved_options is not None:
+        if progress:
+            progress("Restoring Discovery configuration…", 96)
+        set_discovery_options(preserved_options)
+
+    if str(installed.get("state") or "").lower() != "started":
+        if progress:
+            progress("Starting Switch Vision Discovery…", 98)
+        supervisor_request(f"/addons/{new_slug}/start", method="POST")
+
+    final = wait_for_addon(
+        new_slug,
+        expected_version=expected,
+        expected_state="started",
+        timeout=300,
+    )
+
+    return {
+        "updated": True,
+        "recovered": True,
+        "installed": True,
+        "slug": new_slug,
+        "version": expected,
+        "state": final.get("state"),
+    }
 
 
 def update_discovery_after_install(expected_version: str, progress: Progress | None = None) -> dict[str, Any]:
@@ -177,7 +248,7 @@ def update_discovery_after_install(expected_version: str, progress: Progress | N
         progress("Refreshing Discovery app metadata…", 84)
     refresh_local_app_metadata()
 
-    deadline = time.monotonic() + 120
+    deadline = time.monotonic() + 30
     current: dict[str, Any] = {}
     while time.monotonic() < deadline:
         current = addon_info(slug)
@@ -202,15 +273,17 @@ def update_discovery_after_install(expected_version: str, progress: Progress | N
     latest_version = normalise_version(current.get("version_latest"))
     update_available = bool(current.get("update_available"))
     if not update_available and latest_version != expected:
-        raise RuntimeError(
-            f"Supervisor did not offer the expected Discovery update: installed v{current_version or 'unknown'}, "
-            f"latest v{latest_version or 'unknown'}, expected v{expected}."
-        )
+        if progress:
+            progress(
+                "Supervisor still has stale Discovery metadata; recovering runtime…",
+                87,
+            )
+        return recover_stale_discovery_runtime(slug, expected, progress)
 
     if progress:
         progress(f"Updating Discovery to v{expected}…", 90)
     supervisor_request(
-        f"/addons/{slug}/update",
+        f"/store/addons/{slug}/update",
         method="POST",
         payload={"backup": False, "background": False},
     )
