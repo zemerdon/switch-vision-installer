@@ -16,7 +16,7 @@ import urllib.error
 import zipfile
 import re
 
-INSTALLER_VERSION = "2.1.7"
+INSTALLER_VERSION = "2.1.8"
 OPTIONS_PATH = Path(os.environ.get("SV_INSTALLER_OPTIONS", "/data/options.json"))
 STATE_PATH = Path(os.environ.get("SV_INSTALLER_STATE", "/data/state.json"))
 WORK_DIR = Path(os.environ.get("SV_INSTALLER_WORK", "/data/work"))
@@ -819,11 +819,10 @@ def backup_contents(path: Path) -> list[str]:
     entries = []
     if (path / "custom_components/switch_vision").is_dir(): entries.append("Custom component")
     if (path / "www/switch-vision").is_dir(): entries.append("Dashboard frontend")
-    if (path / "local_apps/switch_vision_discovery").is_dir(): entries.append("Discovery app")
-    if find_release_snmp2mqtt_dir(path) is not None: entries.append("SNMP2MQTT app")
     if (path / ".storage/switch_vision_calibrations").is_file(): entries.append("Calibration storage")
     if (path / "discovery-options.json").is_file(): entries.append("Discovery configuration")
     if (path / "snmp2mqtt-options.json").is_file(): entries.append("SNMP2MQTT configuration")
+    if (path / "unifi2mqtt-options.json").is_file(): entries.append("UniFi2MQTT configuration")
     if (path / "share/switch_vision/generated-snmp2mqtt.yaml").is_file(): entries.append("Generated SNMP2MQTT YAML")
     return entries
 
@@ -894,14 +893,15 @@ def create_backup(force: bool = False) -> Path | None:
     target.mkdir(parents=True, exist_ok=False)
     copy_backup(COMPONENT_DIR, target, "custom_components/switch_vision")
     copy_backup(FRONTEND_DIR, target, "www/switch-vision")
-    copy_backup(DISCOVERY_DIR, target, "addons/switch_vision_discovery")
-    copy_backup(SNMP2MQTT_DIR, target, "addons/switch_vision_snmp2mqtt")
     discovery_options = get_discovery_options()
     if discovery_options is not None:
         (target / "discovery-options.json").write_text(json.dumps(discovery_options, indent=2) + "\n", encoding="utf-8")
     snmp2mqtt_options = get_snmp2mqtt_options()
     if snmp2mqtt_options is not None:
         (target / "snmp2mqtt-options.json").write_text(json.dumps(snmp2mqtt_options, indent=2) + "\n", encoding="utf-8")
+    unifi2mqtt_options = get_unifi2mqtt_options()
+    if unifi2mqtt_options is not None:
+        (target / "unifi2mqtt-options.json").write_text(json.dumps(unifi2mqtt_options, indent=2) + "\n", encoding="utf-8")
     if GENERATED_SNMP2MQTT_YAML.is_file():
         yaml_target = target / "share" / "switch_vision" / GENERATED_SNMP2MQTT_YAML.name
         yaml_target.parent.mkdir(parents=True, exist_ok=True)
@@ -916,6 +916,7 @@ def create_backup(force: bool = False) -> Path | None:
         "discovery_configuration_saved": discovery_options is not None,
         "configured_switches": configured_switch_count(discovery_options),
         "snmp2mqtt_configuration_saved": snmp2mqtt_options is not None,
+        "unifi2mqtt_configuration_saved": unifi2mqtt_options is not None,
         "snmp2mqtt_generated_yaml_saved": GENERATED_SNMP2MQTT_YAML.is_file(),
     }
     (target / "backup.json").write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
@@ -1001,6 +1002,7 @@ def list_backups() -> list[dict[str, Any]]:
             "discovery_configuration_saved": bool(meta.get("discovery_configuration_saved")),
             "configured_switches": int(meta.get("configured_switches") or 0),
             "snmp2mqtt_configuration_saved": bool(meta.get("snmp2mqtt_configuration_saved")),
+            "unifi2mqtt_configuration_saved": bool(meta.get("unifi2mqtt_configuration_saved")),
             "snmp2mqtt_generated_yaml_saved": bool(meta.get("snmp2mqtt_generated_yaml_saved")),
         })
     return result
@@ -1034,7 +1036,6 @@ def restore_backup(name: str, progress: Progress | None = None) -> dict[str, Any
     mappings = [
         (backup / "custom_components/switch_vision", COMPONENT_DIR, "Custom component"),
         (backup / "www/switch-vision", FRONTEND_DIR, "Dashboard frontend"),
-        (backup / "addons/switch_vision_snmp2mqtt", SNMP2MQTT_DIR, "SNMP2MQTT add-on"),
     ]
     for idx, (source, destination, label) in enumerate(mappings, start=1):
         if source.is_dir():
@@ -1054,6 +1055,13 @@ def restore_backup(name: str, progress: Progress | None = None) -> dict[str, Any
             if progress: progress("Restoring SNMP2MQTT configuration…", 86)
             set_snmp2mqtt_options(options)
             restored.append("SNMP2MQTT configuration")
+    unifi2mqtt_options_file = backup / "unifi2mqtt-options.json"
+    if unifi2mqtt_options_file.is_file():
+        options = json.loads(unifi2mqtt_options_file.read_text(encoding="utf-8"))
+        if isinstance(options, dict):
+            if progress: progress("Restoring UniFi2MQTT configuration…", 90)
+            set_unifi2mqtt_options(options)
+            restored.append("UniFi2MQTT configuration")
     generated_yaml = backup / "share" / "switch_vision" / "generated-snmp2mqtt.yaml"
     if generated_yaml.is_file():
         GENERATED_SNMP2MQTT_YAML.parent.mkdir(parents=True, exist_ok=True)
@@ -1065,8 +1073,8 @@ def restore_backup(name: str, progress: Progress | None = None) -> dict[str, Any
     if not restored: raise RuntimeError("The selected backup contains no restorable Switch Vision components.")
     actions = []
     if "Custom component" in restored: actions.append("Restart Home Assistant Core")
-    if "SNMP2MQTT add-on" in restored: actions.extend(["Rebuild or reinstall Switch Vision SNMP2MQTT", "Start Switch Vision SNMP2MQTT"])
     if "SNMP2MQTT configuration" in restored or "Generated SNMP2MQTT YAML" in restored: actions.append("Restart Switch Vision SNMP2MQTT")
+    if "UniFi2MQTT configuration" in restored: actions.append("Restart Switch Vision UniFi2MQTT if it is running")
     if "Dashboard frontend" in restored: actions.append("Hard-refresh the browser")
     return {"ok": True, "backup": name, "restored": restored, "required_actions": actions, "completed_at": datetime.now(timezone.utc).isoformat()}
 
@@ -1098,9 +1106,6 @@ def component_plan(root: Path) -> tuple[list[tuple[Path, Path, str]], list[str],
             (root / "custom_components" / "switch_vision", COMPONENT_DIR, "Custom component"),
             (frontend_stage, FRONTEND_DIR, "Dashboard frontend and visual assets"),
         ]
-        release_snmp2mqtt = find_release_snmp2mqtt_dir(root)
-        if release_snmp2mqtt is not None:
-            mappings.append((release_snmp2mqtt, SNMP2MQTT_DIR, "SNMP2MQTT add-on"))
         # Frontend stage is temporary, so return copied source paths only from a persistent temp clone.
         persistent = WORK_DIR / "plan-frontend"
         if persistent.exists(): shutil.rmtree(persistent)
@@ -1120,7 +1125,6 @@ def install_release(root: Path, version: str, checksum: str, progress: Progress 
         validate_backup(backup)
     if progress: progress("Backup verified. Installing changed components…", 62)
     custom_assets = collect_custom_assets(); installed=[]; preserved=[]; warnings=[]
-    preserved_snmp2mqtt_options = get_snmp2mqtt_options()
     try:
         for idx, (source, destination, label) in enumerate(changed, start=1):
             replace_tree(source, destination); installed.append(label)
@@ -1132,9 +1136,6 @@ def install_release(root: Path, version: str, checksum: str, progress: Progress 
                     path = target / name
                     if not path.exists(): path.write_bytes(data); preserved.append(f"{folder}/{name}")
                     else: warnings.append(f"Custom asset not restored because the release now provides {folder}/{name}")
-        if "SNMP2MQTT add-on" in installed and preserved_snmp2mqtt_options is not None:
-            try: set_snmp2mqtt_options(preserved_snmp2mqtt_options)
-            except Exception as exc: warnings.append(f"SNMP2MQTT options could not be restored automatically: {exc}")
     except Exception as exc:
         rollback_note = ""
         if backup is not None:
@@ -1144,13 +1145,10 @@ def install_release(root: Path, version: str, checksum: str, progress: Progress 
             except Exception as rollback_exc:
                 rollback_note = f" Automatic rollback also failed: {rollback_exc}"
         raise RuntimeError(f"Installation failed: {exc}.{rollback_note}") from exc
-    if find_release_snmp2mqtt_dir(root) is None:
-        warnings.append("The Switch Vision release does not contain an SNMP2MQTT add-on package; the existing add-on was left unchanged.")
     if not GENERATED_SNMP2MQTT_YAML.is_file():
         warnings.append("Generated SNMP2MQTT YAML was not found at /share/switch_vision/generated-snmp2mqtt.yaml.")
     actions=[]
     if "Custom component" in installed: actions.append("Restart Home Assistant Core")
-    if "SNMP2MQTT add-on" in installed: actions.extend(["Rebuild or reinstall Switch Vision SNMP2MQTT", "Restart Switch Vision SNMP2MQTT"])
     if "Dashboard frontend and visual assets" in installed: actions.append("Hard-refresh the browser if older frontend content remains")
     result = InstallResult(True, version, str(backup) if backup else None, installed, unchanged, preserved, warnings, actions, checksum, datetime.now(timezone.utc).isoformat())
     STATE_PATH.parent.mkdir(parents=True, exist_ok=True)

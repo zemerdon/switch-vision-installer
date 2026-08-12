@@ -1,0 +1,48 @@
+name: Validate Installer
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile Python
+        run: |
+          python -m py_compile \
+            switch_vision_installer/app/installer.py \
+            switch_vision_installer/app/repository_setup.py \
+            switch_vision_installer/app/web.py \
+            tests/test_repository_backup_model.py
+
+      - name: Check shell syntax
+        run: bash -n switch_vision_installer/run.sh
+
+      - name: Validate repository-era backup and restore
+        run: python tests/test_repository_backup_model.py
+
+      - name: Validate release metadata
+        run: |
+          grep -F 'version: "2.1.8"' switch_vision_installer/config.yaml
+          grep -F 'INSTALLER_VERSION = "2.1.8"' switch_vision_installer/app/installer.py
+          grep -F '## v2.1.8' switch_vision_installer/CHANGELOG.md

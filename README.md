@@ -20,11 +20,12 @@ After the repository is added, the Installer is the only manual installation pat
 
 - Switch Vision custom integration
 - Dashboard frontend and bundled visual assets
-- Switch Vision Discovery app
-- Switch Vision SNMP2MQTT app when included in the release
-- Discovery and SNMP2MQTT options
+- Repository-backed Switch Vision Discovery, SNMP2MQTT, and optional UniFi2MQTT apps
+- Discovery, SNMP2MQTT, and UniFi2MQTT Supervisor options
 - Generated SNMP2MQTT YAML
 - Calibration storage and custom logos/faceplates
+
+Repository-managed app source trees are not copied from Switch Vision release ZIPs and are not restored from Installer backups.
 
 ## Release source
 

@@ -1,5 +1,16 @@
 # Changelog
 
+## v2.1.8
+
+- Converts Installer backup/restore to the repository-managed app model.
+- Stops backing up or restoring Discovery and SNMP2MQTT local app source trees.
+- Adds UniFi2MQTT Supervisor options to backup, validation metadata, listing, and restore.
+- Keeps Discovery and SNMP2MQTT configuration backups while restoring them only through Supervisor.
+- Stops copying SNMP2MQTT app source from the main Switch Vision release ZIP.
+- Removes obsolete post-install instructions that treated SNMP2MQTT as a bundled local app.
+- Adds GitHub Actions validation and an offline regression test for repository-era backup/restore behavior.
+- Updates Installer documentation to describe repository-managed apps and sensitive option backups.
+
 ## v2.1.7
 
 - Fixes legacy Discovery source cleanup on current Home Assistant Supervisor releases by using the `local_apps` mount at `/local_apps` instead of the deprecated `/addons` mount.
