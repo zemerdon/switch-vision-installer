@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.1.6
+
+- Fixes Discovery repository app detection by matching Home Assistant Supervisor's repository slug/namespace instead of assuming the store app reports the GitHub URL.
+- Correctly recognises repository-backed Discovery slugs such as `3c82cf46_switch_vision_discovery`.
+- Removes the false 120-second wait that occurred even when the Discovery repository and app were already visible in the Home Assistant App store.
+- Makes Discovery repository setup and local-to-repository reconciliation mandatory for a successful Switch Vision install/reinstall.
+- Refuses to report installation success unless the repository-backed Discovery app is installed, started, and matches the expected Supervisor store slug and published Discovery version.
+- Keeps the existing safe migration order: preserve Discovery options, remove the legacy runtime without deleting configuration, install the repository app, restore options, start and verify it, then retire legacy local files.
+
+
 ## v2.1.5
 
 - Moves Switch Vision Discovery from the bundled local `/addons` model to the official `switch-vision-discovery` Home Assistant App repository.

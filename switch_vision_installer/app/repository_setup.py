@@ -152,50 +152,63 @@ def _store_addons() -> list[dict[str, Any]]:
     return [item for item in data if isinstance(item, dict)]
 
 
-def _discovery_store_entry() -> dict[str, Any] | None:
-    expected_repo = _normalise_repo_url(DISCOVERY_REPOSITORY)
+def _repository_slug_for(repository: str) -> str:
+    """Return Supervisor's repository identity for a registered repository."""
+    entry = _repository_entry_for(repository)
+    if not entry:
+        return ""
+    return str(entry.get("slug") or "").strip()
+
+
+def _discovery_store_entry(repository_slug: str | None = None) -> dict[str, Any] | None:
+    """Find Discovery in the store using Supervisor repository identity."""
+    expected_url = _normalise_repo_url(DISCOVERY_REPOSITORY)
+    expected_repo_slug = str(
+        repository_slug or _repository_slug_for(DISCOVERY_REPOSITORY)
+    ).strip().lower()
+
     for item in _store_addons():
-        slug = str(item.get("slug") or "").lower()
-        name = str(item.get("name") or "").lower()
-        repository = _normalise_repo_url(item.get("repository"))
+        slug = str(item.get("slug") or "").strip().lower()
+        name = str(item.get("name") or "").strip().lower()
+        item_repository = str(item.get("repository") or "").strip().lower()
+        item_repository_url = _normalise_repo_url(item.get("repository"))
+
         matches_app = (
             slug.endswith("switch_vision_discovery")
             or "switch-vision-discovery" in slug
             or name == "switch vision discovery"
         )
-        if matches_app and repository == expected_repo:
+        belongs_to_repository = (
+            bool(expected_repo_slug)
+            and (
+                item_repository == expected_repo_slug
+                or slug.startswith(expected_repo_slug + "_")
+            )
+        ) or item_repository_url == expected_url
+
+        if matches_app and belongs_to_repository:
             return item
     return None
 
 
-def _wait_for_discovery(timeout: int = 120) -> str:
+def _wait_for_discovery(repository_slug: str, timeout: int = 60) -> dict[str, Any]:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        entry = _discovery_store_entry()
-        if entry:
-            slug = str(entry.get("slug") or "")
-            if slug:
-                return slug
+        entry = _discovery_store_entry(repository_slug)
+        if entry and str(entry.get("slug") or "").strip():
+            return entry
         time.sleep(2)
     raise RuntimeError(
-        "Switch Vision Discovery repository is registered, but the app did not become available "
-        "in the Home Assistant store within 120 seconds."
+        "Switch Vision Discovery repository is registered, but its repository-backed app "
+        "did not become available in the Home Assistant store within 60 seconds."
     )
 
 
 def ensure_discovery_repository(progress: Progress | None = None) -> dict[str, Any]:
     """Ensure the official repository-backed Discovery app is available."""
-    entry = _discovery_store_entry()
-    if entry:
-        return {
-            "added": False,
-            "available": True,
-            "slug": str(entry.get("slug") or ""),
-            "repository": DISCOVERY_REPOSITORY,
-        }
-
     existing = _repository_entry_for(DISCOVERY_REPOSITORY)
     added = False
+
     if existing is None:
         if progress:
             progress("Adding the Switch Vision Discovery App repository…", 2)
@@ -213,11 +226,37 @@ def ensure_discovery_repository(progress: Progress | None = None) -> dict[str, A
     if progress:
         progress("Refreshing the Home Assistant App store…", 4)
     installer_core.reload_addon_store()
-    slug = _wait_for_discovery()
+
+    repository_entry = _repository_entry_for(DISCOVERY_REPOSITORY)
+    if repository_entry is None:
+        raise RuntimeError(
+            "Home Assistant did not retain the Switch Vision Discovery App repository "
+            "after the App store reload."
+        )
+
+    repository_slug = str(repository_entry.get("slug") or "").strip()
+    if not repository_slug:
+        raise RuntimeError(
+            "Home Assistant registered the Switch Vision Discovery repository without "
+            "a Supervisor repository slug."
+        )
+
+    entry = _discovery_store_entry(repository_slug)
+    if entry is None:
+        entry = _wait_for_discovery(repository_slug)
+
+    store_slug = str(entry.get("slug") or "").strip()
+    if not store_slug:
+        raise RuntimeError(
+            "Home Assistant returned the Discovery store app without an app slug."
+        )
+
     return {
         "added": added,
         "available": True,
-        "slug": slug,
+        "slug": store_slug,
+        "repository_slug": repository_slug,
         "repository": DISCOVERY_REPOSITORY,
+        "version": entry.get("version_latest") or entry.get("version"),
     }
 

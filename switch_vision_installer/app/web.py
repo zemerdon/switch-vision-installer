@@ -88,14 +88,15 @@ def set_progress(message: str, percent: int) -> None:
 
 def install_switch_vision():
     repository_warnings: list[str] = []
-    discovery_repository: dict[str, object] | None = None
 
+    # Discovery is required. Repository setup must succeed before we can
+    # report a successful Switch Vision installation.
     try:
         discovery_repository = ensure_discovery_repository(set_progress)
     except Exception as exc:
-        repository_warnings.append(
-            "The Discovery App repository could not be registered automatically: " + str(exc)
-        )
+        raise RuntimeError(
+            "Switch Vision Discovery repository setup failed: " + str(exc)
+        ) from exc
 
     try:
         ensure_snmp2mqtt_repository(set_progress)
@@ -109,25 +110,53 @@ def install_switch_vision():
         lambda message, percent: set_progress(message, min(90, max(5, int(percent * 0.9))))
     )
 
-    if discovery_repository:
-        try:
-            set_progress("Reconciling Switch Vision Discovery…", 91)
-            discovery_result = reconcile_discovery_repository_app(
-                str(discovery_repository.get("slug") or ""),
-                set_progress,
-            )
-            if discovery_result.get("migrated"):
-                result.installed.append("Discovery app (migrated to repository)")
-            elif discovery_result.get("installed_now"):
-                result.installed.append("Discovery app")
-            elif discovery_result.get("updated"):
-                result.installed.append("Discovery app update")
-            else:
-                result.unchanged.append("Discovery app")
-        except Exception as exc:
-            result.warnings.append(
-                "Switch Vision installed, but Discovery repository reconciliation failed: " + str(exc)
-            )
+    set_progress("Reconciling Switch Vision Discovery…", 91)
+    try:
+        discovery_result = reconcile_discovery_repository_app(
+            str(discovery_repository.get("slug") or ""),
+            set_progress,
+        )
+    except Exception as exc:
+        raise RuntimeError(
+            "Switch Vision files were installed, but Discovery migration failed. "
+            "The Installer will not report success until repository-backed Discovery "
+            "is installed and started: " + str(exc)
+        ) from exc
+
+    expected_slug = str(discovery_repository.get("slug") or "").strip()
+    actual_slug = str(discovery_result.get("slug") or "").strip()
+    actual_state = str(discovery_result.get("state") or "").strip().lower()
+    if (
+        not discovery_result.get("installed")
+        or actual_slug != expected_slug
+        or actual_state != "started"
+    ):
+        raise RuntimeError(
+            "Discovery migration verification failed: "
+            f"expected repository app {expected_slug!r} in state 'started', "
+            f"received slug={actual_slug!r}, state={actual_state!r}."
+        )
+
+    expected_version = installer_core.normalise_version(
+        discovery_repository.get("version")
+    )
+    actual_version = installer_core.normalise_version(
+        discovery_result.get("version")
+    )
+    if expected_version and actual_version != expected_version:
+        raise RuntimeError(
+            "Discovery migration version verification failed: "
+            f"expected v{expected_version}, received v{actual_version or 'unknown'}."
+        )
+
+    if discovery_result.get("migrated"):
+        result.installed.append("Discovery app (migrated to repository)")
+    elif discovery_result.get("installed_now"):
+        result.installed.append("Discovery app")
+    elif discovery_result.get("updated"):
+        result.installed.append("Discovery app update")
+    else:
+        result.unchanged.append("Discovery app")
 
     try:
         snmp = snmp2mqtt_status()
@@ -142,9 +171,11 @@ def install_switch_vision():
 
     result.warnings.extend(repository_warnings)
     installer_core.STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    installer_core.STATE_PATH.write_text(json.dumps(asdict(result), indent=2) + "\n", encoding="utf-8")
+    installer_core.STATE_PATH.write_text(
+        json.dumps(asdict(result), indent=2) + "\n",
+        encoding="utf-8",
+    )
     return result
-
 
 def supervisor_request(path: str, method: str = "POST") -> dict:
     if not SUPERVISOR_TOKEN:
