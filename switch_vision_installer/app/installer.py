@@ -16,20 +16,26 @@ import urllib.error
 import zipfile
 import re
 
-INSTALLER_VERSION = "2.1.6"
+INSTALLER_VERSION = "2.1.7"
 OPTIONS_PATH = Path(os.environ.get("SV_INSTALLER_OPTIONS", "/data/options.json"))
 STATE_PATH = Path(os.environ.get("SV_INSTALLER_STATE", "/data/state.json"))
 WORK_DIR = Path(os.environ.get("SV_INSTALLER_WORK", "/data/work"))
 BACKUP_DIR = Path(os.environ.get("SV_INSTALLER_BACKUPS", "/share/switch-vision-backups"))
 LEGACY_BACKUP_DIR = Path("/share/switch_vision/installer_backups")
 HA_CONFIG = Path("/homeassistant")
-ADDONS_DIR = Path("/addons")
+# Home Assistant Supervisor 2026.07 renamed the writable local app mapping
+# from `addons` (/addons) to `local_apps` (/local_apps). The Installer uses
+# the current mapping but still checks the legacy path during migration.
+LOCAL_APPS_DIR = Path("/local_apps")
+LEGACY_ADDONS_DIR = Path("/addons")
+ADDONS_DIR = LOCAL_APPS_DIR
 
 COMPONENT_DIR = HA_CONFIG / "custom_components" / "switch_vision"
 FRONTEND_DIR = HA_CONFIG / "www" / "switch-vision"
-DISCOVERY_DIR = ADDONS_DIR / "switch_vision_discovery"
-SNMP2MQTT_DIR = ADDONS_DIR / "switch_vision_snmp2mqtt"
-UNIFI2MQTT_DIR = ADDONS_DIR / "switch_vision_unifi2mqtt"
+DISCOVERY_DIR = LOCAL_APPS_DIR / "switch_vision_discovery"
+LEGACY_DISCOVERY_DIR = LEGACY_ADDONS_DIR / "switch_vision_discovery"
+SNMP2MQTT_DIR = LOCAL_APPS_DIR / "switch_vision_snmp2mqtt"
+UNIFI2MQTT_DIR = LOCAL_APPS_DIR / "switch_vision_unifi2mqtt"
 SHARE_DIR = Path("/share")
 GENERATED_SNMP2MQTT_YAML = SHARE_DIR / "switch_vision" / "generated-snmp2mqtt.yaml"
 
@@ -224,14 +230,43 @@ def reconcile_discovery_repository_app(
 
     final = wait_for_addon(store_slug, expected_state="started", timeout=180)
 
-    # Only retire the legacy /addons source after the new repository-backed
-    # runtime has been verified as started.
-    if DISCOVERY_DIR.is_dir():
+    # Only retire legacy local Discovery source files after the repository-backed
+    # runtime has been verified as started. Supervisor 2026.07 renamed the
+    # writable local-app mount from /addons to /local_apps, so check both.
+    legacy_sources = [
+        path for path in legacy_discovery_source_paths() if path.is_dir()
+    ]
+    try:
+        local_store_entry = local_discovery_store_present()
+    except Exception:
+        local_store_entry = True
+
+    if legacy_sources or local_store_entry:
         if progress:
             progress("Retiring legacy local Discovery files…", 99)
-        shutil.rmtree(DISCOVERY_DIR)
-        reload_addon_store()
-        final = wait_for_addon(store_slug, expected_state="started", timeout=120)
+        for path in legacy_sources:
+            shutil.rmtree(path)
+
+        if progress:
+            progress("Refreshing Home Assistant local app metadata…", 99)
+        reload_local_app_metadata()
+        wait_for_legacy_discovery_absent(timeout=60)
+
+        # The repository-backed app must remain healthy after local metadata
+        # is reloaded and the old source has disappeared.
+        final = wait_for_addon(
+            store_slug,
+            expected_state="started",
+            timeout=120,
+        )
+
+    # Never report a completed migration while Supervisor still advertises
+    # local_switch_vision_discovery.
+    if local_discovery_store_present():
+        raise RuntimeError(
+            "Repository-backed Discovery is running, but Home Assistant still "
+            "advertises legacy local_switch_vision_discovery."
+        )
 
     return {
         "installed": True,
@@ -242,6 +277,85 @@ def reconcile_discovery_repository_app(
         "version": normalise_version(final.get("version")),
         "state": final.get("state"),
     }
+
+
+def legacy_discovery_source_paths() -> tuple[Path, ...]:
+    """Return current and legacy local Discovery source locations."""
+    paths = (DISCOVERY_DIR, LEGACY_DISCOVERY_DIR)
+    result: list[Path] = []
+    seen: set[str] = set()
+    for path in paths:
+        key = str(path)
+        if key not in seen:
+            seen.add(key)
+            result.append(path)
+    return tuple(result)
+
+
+def local_discovery_store_present() -> bool:
+    """Return True when Supervisor still advertises legacy local Discovery."""
+    payload = supervisor_request("/store")
+    data: Any = payload.get("data", payload) if isinstance(payload, dict) else payload
+    addons = data.get("addons", []) if isinstance(data, dict) else []
+    if not isinstance(addons, list):
+        return False
+
+    for item in addons:
+        if not isinstance(item, dict):
+            continue
+        slug = str(item.get("slug") or "").strip().lower()
+        name = str(item.get("name") or "").strip().lower()
+        repository = str(item.get("repository") or "").strip().lower()
+        if slug == "local_switch_vision_discovery":
+            return True
+        if (
+            repository == "local"
+            and name == "switch vision discovery"
+            and slug.endswith("switch_vision_discovery")
+        ):
+            return True
+    return False
+
+
+def reload_local_app_metadata() -> None:
+    """Refresh both installed/local app metadata and App Store metadata."""
+    errors: list[str] = []
+    for endpoint in ("/addons/reload", "/store/reload"):
+        try:
+            supervisor_request(endpoint, method="POST")
+        except Exception as exc:
+            errors.append(f"{endpoint}: {exc}")
+    if len(errors) == 2:
+        raise RuntimeError(
+            "Home Assistant could not reload local app or App Store metadata: "
+            + "; ".join(errors)
+        )
+
+
+def wait_for_legacy_discovery_absent(timeout: int = 60) -> None:
+    """Wait until local Discovery files and Supervisor store entry are gone."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        paths_present = [path for path in legacy_discovery_source_paths() if path.is_dir()]
+        try:
+            store_present = local_discovery_store_present()
+        except Exception:
+            store_present = True
+        if not paths_present and not store_present:
+            return
+        time.sleep(2)
+
+    paths_present = [
+        str(path) for path in legacy_discovery_source_paths() if path.is_dir()
+    ]
+    try:
+        store_present = local_discovery_store_present()
+    except Exception:
+        store_present = True
+    raise RuntimeError(
+        "Legacy local Discovery cleanup did not complete within 60 seconds "
+        f"(paths_present={paths_present!r}, supervisor_local_entry={store_present!r})."
+    )
 
 
 def configured_switch_count(options: dict[str, Any] | None) -> int:

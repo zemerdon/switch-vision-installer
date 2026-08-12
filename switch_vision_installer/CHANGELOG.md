@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.1.7
+
+- Fixes legacy Discovery source cleanup on current Home Assistant Supervisor releases by using the `local_apps` mount at `/local_apps` instead of the deprecated `/addons` mount.
+- Keeps `/addons/switch_vision_discovery` as a migration-only compatibility check for older installations.
+- Removes stale local Discovery source files only after repository-backed Discovery is verified started.
+- Reloads both local app metadata (`/addons/reload`) and App Store metadata (`/store/reload`) after cleanup.
+- Verifies that `local_switch_vision_discovery` is no longer advertised by Supervisor before reporting a completed migration.
+- Re-verifies the repository-backed Discovery app remains started after local metadata is refreshed.
+
+
 ## v2.1.6
 
 - Fixes Discovery repository app detection by matching Home Assistant Supervisor's repository slug/namespace instead of assuming the store app reports the GitHub URL.
