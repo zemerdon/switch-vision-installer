@@ -8,8 +8,8 @@ import installer as installer_core
 INSTALLER_VERSION = str(os.environ.get("SV_INSTALLER_VERSION") or installer_core.INSTALLER_VERSION).strip()
 installer_core.INSTALLER_VERSION = INSTALLER_VERSION
 
-from installer import apply_backup_retention, create_manual_backup, delete_backup, discovery_status, download_and_install, dry_run, find_discovery_slug, find_snmp2mqtt_slug, find_unifi2mqtt_slug, install_supervisor_addon, latest_release, list_backups, load_options, restore_backup, snmp2mqtt_status, status, unifi2mqtt_status, validate_named_backup
-from repository_setup import ensure_snmp2mqtt_repository, ensure_unifi2mqtt_repository
+from installer import apply_backup_retention, create_manual_backup, delete_backup, discovery_status, download_and_install, dry_run, find_discovery_slug, find_snmp2mqtt_slug, find_unifi2mqtt_slug, install_supervisor_addon, latest_release, list_backups, load_options, reconcile_discovery_repository_app, restore_backup, snmp2mqtt_status, status, unifi2mqtt_status, validate_named_backup
+from repository_setup import ensure_discovery_repository, ensure_snmp2mqtt_repository, ensure_unifi2mqtt_repository
 
 WEB_ROOT = Path(os.environ.get("SV_INSTALLER_WEB", "/opt/switch-vision-installer/www"))
 UI_PREFERENCES_PATH = Path(os.environ.get("SV_UI_PREFERENCES", "/share/switch_vision/ui-preferences.json"))
@@ -87,30 +87,52 @@ def set_progress(message: str, percent: int) -> None:
 
 
 def install_switch_vision():
-    repository_warning = None
+    repository_warnings: list[str] = []
+    discovery_repository: dict[str, object] | None = None
+
+    try:
+        discovery_repository = ensure_discovery_repository(set_progress)
+    except Exception as exc:
+        repository_warnings.append(
+            "The Discovery App repository could not be registered automatically: " + str(exc)
+        )
+
     try:
         ensure_snmp2mqtt_repository(set_progress)
     except Exception as exc:
-        repository_warning = str(exc)
-
-    result = download_and_install(set_progress)
-
-    # Fresh-install convenience: only install Supervisor apps that are missing.
-    try:
-        discovery = discovery_status()
-        if not discovery.get("installed"):
-            set_progress("Installing Switch Vision Discovery…", 96)
-            install_supervisor_addon("discovery")
-    except Exception as exc:
-        result.warnings.append(
-            "Switch Vision installed, but Discovery could not be installed automatically: "
-            + str(exc)
+        repository_warnings.append(
+            "The SNMP2MQTT App repository could not be registered automatically: " + str(exc)
         )
+
+    # Reserve the final 10% for Supervisor-managed app reconciliation.
+    result = download_and_install(
+        lambda message, percent: set_progress(message, min(90, max(5, int(percent * 0.9))))
+    )
+
+    if discovery_repository:
+        try:
+            set_progress("Reconciling Switch Vision Discovery…", 91)
+            discovery_result = reconcile_discovery_repository_app(
+                str(discovery_repository.get("slug") or ""),
+                set_progress,
+            )
+            if discovery_result.get("migrated"):
+                result.installed.append("Discovery app (migrated to repository)")
+            elif discovery_result.get("installed_now"):
+                result.installed.append("Discovery app")
+            elif discovery_result.get("updated"):
+                result.installed.append("Discovery app update")
+            else:
+                result.unchanged.append("Discovery app")
+        except Exception as exc:
+            result.warnings.append(
+                "Switch Vision installed, but Discovery repository reconciliation failed: " + str(exc)
+            )
 
     try:
         snmp = snmp2mqtt_status()
         if not snmp.get("installed"):
-            set_progress("Installing Switch Vision SNMP2MQTT…", 98)
+            set_progress("Installing Switch Vision SNMP2MQTT…", 99)
             install_supervisor_addon("snmp2mqtt")
     except Exception as exc:
         result.warnings.append(
@@ -118,11 +140,9 @@ def install_switch_vision():
             + str(exc)
         )
 
-    if repository_warning:
-        result.warnings.append(
-            "Switch Vision installed, but the SNMP2MQTT App repository could not be registered automatically: "
-            + repository_warning
-        )
+    result.warnings.extend(repository_warnings)
+    installer_core.STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    installer_core.STATE_PATH.write_text(json.dumps(asdict(result), indent=2) + "\n", encoding="utf-8")
     return result
 
 
@@ -216,7 +236,8 @@ class Handler(BaseHTTPRequestHandler):
                 threading.Thread(target=request_core_restart_async, daemon=True).start()
                 return self.send_json({"ok":True,"requested":True,"message":"Home Assistant Core restart requested."},202)
             if path=="/api/install-discovery":
-                result = install_supervisor_addon("discovery")
+                repository = ensure_discovery_repository()
+                result = reconcile_discovery_repository_app(str(repository.get("slug") or ""))
                 return self.send_json({"ok":True,"requested":True,**result})
             if path=="/api/restart-discovery":
                 result = supervisor_request(f"/addons/{find_discovery_slug()}/restart")

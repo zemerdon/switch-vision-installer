@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.1.5
+
+- Moves Switch Vision Discovery from the bundled local `/addons` model to the official `switch-vision-discovery` Home Assistant App repository.
+- Automatically registers the Discovery repository and installs or updates Discovery through Supervisor store endpoints.
+- Migrates existing local Discovery installations without deleting their saved options, then restores configuration to the repository-backed app.
+- Removes the legacy local Discovery source after migration so Supervisor no longer has competing local and repository copies.
+- Stops requiring or copying Discovery from the main Switch Vision release ZIP; Discovery now versions independently.
+- Keeps backup protection for Discovery configuration while no longer restoring legacy local Discovery source files.
+- Clears stale previous success results when a new Installer operation begins.
+
 ## v2.1.4
 
 - Refreshes both Supervisor app metadata and store metadata before deciding Discovery is stale.
