@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.1.11
+
+- Fixes Discovery backup/restore metadata counting the Supervisor blank starter switch row as a configured switch.
+- Counts only switch-list rows containing a real switch name or management host.
+- Preserves legacy `devices` and `targets` list counting behaviour.
+- Adds regression coverage for blank-only and blank-plus-configured Discovery switch lists.
+
 ## v2.1.10
 
 - Adds **Restart Switch Vision Discovery** to required restore actions whenever Discovery configuration is restored.

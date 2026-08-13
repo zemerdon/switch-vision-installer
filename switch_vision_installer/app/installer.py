@@ -16,7 +16,7 @@ import urllib.error
 import zipfile
 import re
 
-INSTALLER_VERSION = "2.1.10"
+INSTALLER_VERSION = "2.1.11"
 OPTIONS_PATH = Path(os.environ.get("SV_INSTALLER_OPTIONS", "/data/options.json"))
 STATE_PATH = Path(os.environ.get("SV_INSTALLER_STATE", "/data/state.json"))
 WORK_DIR = Path(os.environ.get("SV_INSTALLER_WORK", "/data/work"))
@@ -363,8 +363,22 @@ def configured_switch_count(options: dict[str, Any] | None) -> int:
         return 0
     for key in ("switches", "devices", "targets"):
         value = options.get(key)
-        if isinstance(value, list):
+        if not isinstance(value, list):
+            continue
+        if key != "switches":
             return len(value)
+
+        count = 0
+        for row in value:
+            if isinstance(row, dict):
+                if any(
+                    str(row.get(field) or "").strip()
+                    for field in ("switch_name", "switch_host")
+                ):
+                    count += 1
+            elif str(row or "").strip():
+                count += 1
+        return count
     return 0
 
 
