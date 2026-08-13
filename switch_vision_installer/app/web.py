@@ -120,7 +120,14 @@ def install_switch_vision():
         raise RuntimeError(
             "Switch Vision files were installed, but Discovery migration failed. "
             "The Installer will not report success until repository-backed Discovery "
-            "is installed and started: " + str(exc)
+            "is installed and started. "
+            "This can be temporary while Home Assistant refreshes the App store or "
+            "a new Discovery image becomes available. "
+            "Wait about one minute, then click Reinstall to retry Discovery. "
+            "Components that are already current will be left unchanged. "
+            "If Discovery still fails after another attempt, check Home Assistant "
+            "Supervisor logs for details. "
+            "Original error: " + str(exc)
         ) from exc
 
     expected_slug = str(discovery_repository.get("slug") or "").strip()

@@ -18,7 +18,7 @@ mod = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = mod
 spec.loader.exec_module(mod)
 
-assert mod.INSTALLER_VERSION == "2.1.12"
+assert mod.INSTALLER_VERSION == "2.1.13"
 
 with tempfile.TemporaryDirectory() as td:
     digest_base = Path(td)
@@ -61,6 +61,15 @@ assert mod.configured_switch_count({"devices": [{"name": "legacy"}]}) == 1
 
 source = INSTALLER.read_text(encoding="utf-8")
 web_source = INSTALLER_JS.read_text(encoding="utf-8")
+web_py_source = (
+    ROOT / "switch_vision_installer" / "app" / "web.py"
+).read_text(encoding="utf-8")
+
+assert "Wait about one minute, then click Reinstall to retry Discovery." in web_py_source
+assert "Components that are already current will be left unchanged." in web_py_source
+assert "check Home Assistant " in web_py_source
+assert "Supervisor logs for details." in web_py_source
+assert "Original error: " in web_py_source
 create_section = source[source.index("def create_backup("):source.index("def create_manual_backup(")]
 restore_section = source[source.index("def restore_backup("):source.index("def collect_custom_assets(")]
 
