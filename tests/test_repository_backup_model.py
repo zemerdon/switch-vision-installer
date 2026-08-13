@@ -18,7 +18,28 @@ mod = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = mod
 spec.loader.exec_module(mod)
 
-assert mod.INSTALLER_VERSION == "2.1.11"
+assert mod.INSTALLER_VERSION == "2.1.12"
+
+with tempfile.TemporaryDirectory() as td:
+    digest_base = Path(td)
+    release_component = digest_base / "release"
+    installed_component = digest_base / "installed"
+    release_component.mkdir()
+    installed_component.mkdir()
+
+    (release_component / "__init__.py").write_text("# fixture\n", encoding="utf-8")
+    (installed_component / "__init__.py").write_text("# fixture\n", encoding="utf-8")
+
+    cache = installed_component / "__pycache__"
+    cache.mkdir()
+    (cache / "__init__.cpython-314.pyc").write_bytes(b"runtime cache")
+    (installed_component / "stray.pyc").write_bytes(b"runtime cache")
+
+    assert mod.tree_digest(release_component) == mod.tree_digest(installed_component)
+
+    (installed_component / "__init__.py").write_text("# changed\n", encoding="utf-8")
+    assert mod.tree_digest(release_component) != mod.tree_digest(installed_component)
+
 
 blank_switch = {
     "switch_name": "",

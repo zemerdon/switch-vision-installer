@@ -1,8 +1,16 @@
-# Switch Vision Installer v2.1.11
+# Switch Vision Installer v2.1.12
 
 Official Home Assistant App for installing and updating Switch Vision from the public Switch Vision release repository.
 
 The Installer is the only repository end users need to add manually. It installs the Switch Vision integration/frontend and manages the official Discovery, SNMP2MQTT, and optional UniFi2MQTT app repositories through Home Assistant Supervisor.
+
+
+
+## v2.1.12
+
+- Dry-run ignores Python runtime cache files created by Home Assistant.
+- `__pycache__`, `.pyc`, and `.pyo` files no longer make a current Switch Vision component appear changed.
+- Real managed-file differences are still detected normally.
 
 
 ## v2.1.11

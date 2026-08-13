@@ -16,7 +16,7 @@ import urllib.error
 import zipfile
 import re
 
-INSTALLER_VERSION = "2.1.11"
+INSTALLER_VERSION = "2.1.12"
 OPTIONS_PATH = Path(os.environ.get("SV_INSTALLER_OPTIONS", "/data/options.json"))
 STATE_PATH = Path(os.environ.get("SV_INSTALLER_STATE", "/data/state.json"))
 WORK_DIR = Path(os.environ.get("SV_INSTALLER_WORK", "/data/work"))
@@ -814,7 +814,10 @@ def tree_digest(path: Path) -> str | None:
     if path.is_file():
         digest.update(path.name.encode()); digest.update(path.read_bytes()); return digest.hexdigest()
     for file in sorted(p for p in path.rglob("*") if p.is_file()):
-        digest.update(file.relative_to(path).as_posix().encode("utf-8")); digest.update(b"\0")
+        relative = file.relative_to(path)
+        if "__pycache__" in relative.parts or file.suffix in {".pyc", ".pyo"}:
+            continue
+        digest.update(relative.as_posix().encode("utf-8")); digest.update(b"\0")
         with file.open("rb") as handle:
             for block in iter(lambda: handle.read(1024 * 1024), b""):
                 digest.update(block)
