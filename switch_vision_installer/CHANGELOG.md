@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.1.12
+
+- Fixes false-positive Custom component changes during dry-run after Home Assistant creates Python bytecode caches.
+- Ignores `__pycache__`, `.pyc`, and `.pyo` runtime files when comparing managed component trees.
+- Keeps real source-file differences detectable.
+- Adds regression coverage proving runtime Python caches do not trigger reinstall recommendations.
+
 ## v2.1.11
 
 - Fixes Discovery backup/restore metadata counting the Supervisor blank starter switch row as a configured switch.
