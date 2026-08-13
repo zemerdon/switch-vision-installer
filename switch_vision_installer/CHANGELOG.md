@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.1.13
+
+- Improves Discovery migration failure guidance during Switch Vision upgrades.
+- Explains that a temporary Home Assistant App Store or newly published Discovery image can cause an installation retry to be required.
+- Advises waiting about one minute and clicking **Reinstall** again; already-current components remain unchanged.
+- Keeps the original Supervisor error visible and directs persistent failures to Supervisor logs.
+- Adds regression coverage for the new recovery guidance.
+
 ## v2.1.12
 
 - Fixes false-positive Custom component changes during dry-run after Home Assistant creates Python bytecode caches.
