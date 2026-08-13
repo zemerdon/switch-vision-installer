@@ -38,11 +38,14 @@ jobs:
       - name: Check shell syntax
         run: bash -n switch_vision_installer/run.sh
 
+      - name: Check frontend syntax
+        run: node --check switch_vision_installer/www/installer.js
+
       - name: Validate repository-era backup and restore
         run: python tests/test_repository_backup_model.py
 
       - name: Validate release metadata
         run: |
-          grep -F 'version: "2.1.9"' switch_vision_installer/config.yaml
-          grep -F 'INSTALLER_VERSION = "2.1.9"' switch_vision_installer/app/installer.py
-          grep -F '## v2.1.9' switch_vision_installer/CHANGELOG.md
+          grep -F 'version: "2.1.10"' switch_vision_installer/config.yaml
+          grep -F 'INSTALLER_VERSION = "2.1.10"' switch_vision_installer/app/installer.py
+          grep -F '## v2.1.10' switch_vision_installer/CHANGELOG.md

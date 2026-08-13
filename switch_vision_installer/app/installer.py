@@ -16,7 +16,7 @@ import urllib.error
 import zipfile
 import re
 
-INSTALLER_VERSION = "2.1.9"
+INSTALLER_VERSION = "2.1.10"
 OPTIONS_PATH = Path(os.environ.get("SV_INSTALLER_OPTIONS", "/data/options.json"))
 STATE_PATH = Path(os.environ.get("SV_INSTALLER_STATE", "/data/state.json"))
 WORK_DIR = Path(os.environ.get("SV_INSTALLER_WORK", "/data/work"))
@@ -1101,6 +1101,7 @@ def restore_backup(name: str, progress: Progress | None = None) -> dict[str, Any
     if not restored: raise RuntimeError("The selected backup contains no restorable Switch Vision components.")
     actions = []
     if "Custom component" in restored: actions.append("Restart Home Assistant Core")
+    if any(item.startswith("Discovery configuration") for item in restored): actions.append("Restart Switch Vision Discovery")
     if "SNMP2MQTT configuration" in restored or "Generated SNMP2MQTT YAML" in restored: actions.append("Restart Switch Vision SNMP2MQTT")
     if "UniFi2MQTT configuration" in restored: actions.append("Restart Switch Vision UniFi2MQTT if it is running")
     if "Dashboard frontend" in restored: actions.append("Hard-refresh the browser")

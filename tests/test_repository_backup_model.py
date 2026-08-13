@@ -9,6 +9,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 INSTALLER = ROOT / "switch_vision_installer" / "app" / "installer.py"
+INSTALLER_JS = ROOT / "switch_vision_installer" / "www" / "installer.js"
 
 spec = importlib.util.spec_from_file_location("sv_installer_backup_test", INSTALLER)
 if spec is None or spec.loader is None:
@@ -17,9 +18,10 @@ mod = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = mod
 spec.loader.exec_module(mod)
 
-assert mod.INSTALLER_VERSION == "2.1.9"
+assert mod.INSTALLER_VERSION == "2.1.10"
 
 source = INSTALLER.read_text(encoding="utf-8")
+web_source = INSTALLER_JS.read_text(encoding="utf-8")
 create_section = source[source.index("def create_backup("):source.index("def create_manual_backup(")]
 restore_section = source[source.index("def restore_backup("):source.index("def collect_custom_assets(")]
 
@@ -29,7 +31,13 @@ assert 'unifi2mqtt-options.json' in create_section
 assert 'unifi2mqtt_options_configured' in create_section
 assert 'addons/switch_vision_snmp2mqtt' not in restore_section
 assert 'unifi2mqtt_options_configured' in restore_section
+assert 'Restart Switch Vision Discovery' in restore_section
 assert 'mappings.append((release_snmp2mqtt, SNMP2MQTT_DIR, "SNMP2MQTT add-on"))' not in source
+
+assert "skipped=(r.skipped||[])" in web_source
+assert "<b>Skipped safely:</b>" in web_source
+assert "unifi2mqtt_configuration_skipped_unconfigured" in web_source
+assert "Not saved (not configured)" in web_source
 
 configured_unifi = {
     "controller_url": "https://192.0.2.2",
@@ -118,8 +126,14 @@ with tempfile.TemporaryDirectory() as td:
     assert "SNMP2MQTT add-on" not in result["restored"]
     assert "UniFi2MQTT configuration" in result["restored"]
     assert result["skipped"] == []
+    assert result["required_actions"] == [
+        "Restart Home Assistant Core",
+        "Restart Switch Vision Discovery",
+        "Restart Switch Vision SNMP2MQTT",
+        "Restart Switch Vision UniFi2MQTT if it is running",
+        "Hard-refresh the browser",
+    ]
 
-    # Simulate the exact v2.1.8 live failure.
     (backup / "unifi2mqtt-options.json").write_text(
         json.dumps(unconfigured_unifi, indent=2) + "\n",
         encoding="utf-8",
@@ -141,8 +155,13 @@ with tempfile.TemporaryDirectory() as td:
     ]
     assert "Generated SNMP2MQTT YAML" in legacy_result["restored"]
     assert "Calibration storage" in legacy_result["restored"]
+    assert legacy_result["required_actions"] == [
+        "Restart Home Assistant Core",
+        "Restart Switch Vision Discovery",
+        "Restart Switch Vision SNMP2MQTT",
+        "Hard-refresh the browser",
+    ]
 
-    # New backups must not claim incomplete UniFi setup is restorable config.
     mod.get_unifi2mqtt_options = lambda: unconfigured_unifi
     unconfigured_backup = mod.create_backup(force=True)
     assert unconfigured_backup is not None
@@ -155,3 +174,4 @@ with tempfile.TemporaryDirectory() as td:
 
 print("Switch Vision Installer repository backup/restore regression: PASS")
 print("Switch Vision Installer unconfigured UniFi restore regression: PASS")
+print("Switch Vision Installer restore guidance/UI regression: PASS")

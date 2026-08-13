@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.1.10
+
+- Adds **Restart Switch Vision Discovery** to required restore actions whenever Discovery configuration is restored.
+- Shows safely skipped restore items in the Installer activity result instead of silently omitting them.
+- Shows `UniFi2MQTT options: Not saved (not configured)` in backup metadata when the optional app is installed but setup is incomplete.
+- Extends the backup/restore regression test to verify Discovery restart guidance and skipped UniFi handling.
+- Adds JavaScript syntax validation to Installer CI.
+
 ## v2.1.9
 
 - Fixes restore failure when optional UniFi2MQTT is installed but has never been configured.
