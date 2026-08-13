@@ -16,7 +16,7 @@ import urllib.error
 import zipfile
 import re
 
-INSTALLER_VERSION = "2.1.8"
+INSTALLER_VERSION = "2.1.9"
 OPTIONS_PATH = Path(os.environ.get("SV_INSTALLER_OPTIONS", "/data/options.json"))
 STATE_PATH = Path(os.environ.get("SV_INSTALLER_STATE", "/data/state.json"))
 WORK_DIR = Path(os.environ.get("SV_INSTALLER_WORK", "/data/work"))
@@ -547,6 +547,24 @@ def get_unifi2mqtt_options() -> dict[str, Any] | None:
     return options if isinstance(options, dict) else None
 
 
+def unifi2mqtt_options_configured(options: dict[str, Any] | None) -> bool:
+    # Only save/restore UniFi options when every required Supervisor field is populated.
+    if not isinstance(options, dict):
+        return False
+    required = (
+        "controller_url",
+        "site_id",
+        "api_key",
+        "verify_ssl",
+        "poll_interval",
+        "mqtt_host",
+        "mqtt_port",
+        "mqtt_topic_prefix",
+        "mqtt_discovery_prefix",
+    )
+    return all(str(options.get(key) if options.get(key) is not None else "").strip() for key in required)
+
+
 def set_unifi2mqtt_options(options: dict[str, Any]) -> None:
     slug = find_unifi2mqtt_slug()
     supervisor_request(f"/addons/{slug}/options", method="POST", payload={"options": options})
@@ -900,7 +918,11 @@ def create_backup(force: bool = False) -> Path | None:
     if snmp2mqtt_options is not None:
         (target / "snmp2mqtt-options.json").write_text(json.dumps(snmp2mqtt_options, indent=2) + "\n", encoding="utf-8")
     unifi2mqtt_options = get_unifi2mqtt_options()
-    if unifi2mqtt_options is not None:
+    unifi2mqtt_configuration_saved = unifi2mqtt_options_configured(unifi2mqtt_options)
+    unifi2mqtt_configuration_skipped_unconfigured = (
+        unifi2mqtt_options is not None and not unifi2mqtt_configuration_saved
+    )
+    if unifi2mqtt_configuration_saved:
         (target / "unifi2mqtt-options.json").write_text(json.dumps(unifi2mqtt_options, indent=2) + "\n", encoding="utf-8")
     if GENERATED_SNMP2MQTT_YAML.is_file():
         yaml_target = target / "share" / "switch_vision" / GENERATED_SNMP2MQTT_YAML.name
@@ -916,7 +938,8 @@ def create_backup(force: bool = False) -> Path | None:
         "discovery_configuration_saved": discovery_options is not None,
         "configured_switches": configured_switch_count(discovery_options),
         "snmp2mqtt_configuration_saved": snmp2mqtt_options is not None,
-        "unifi2mqtt_configuration_saved": unifi2mqtt_options is not None,
+        "unifi2mqtt_configuration_saved": unifi2mqtt_configuration_saved,
+        "unifi2mqtt_configuration_skipped_unconfigured": unifi2mqtt_configuration_skipped_unconfigured,
         "snmp2mqtt_generated_yaml_saved": GENERATED_SNMP2MQTT_YAML.is_file(),
     }
     (target / "backup.json").write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
@@ -1003,6 +1026,7 @@ def list_backups() -> list[dict[str, Any]]:
             "configured_switches": int(meta.get("configured_switches") or 0),
             "snmp2mqtt_configuration_saved": bool(meta.get("snmp2mqtt_configuration_saved")),
             "unifi2mqtt_configuration_saved": bool(meta.get("unifi2mqtt_configuration_saved")),
+            "unifi2mqtt_configuration_skipped_unconfigured": bool(meta.get("unifi2mqtt_configuration_skipped_unconfigured")),
             "snmp2mqtt_generated_yaml_saved": bool(meta.get("snmp2mqtt_generated_yaml_saved")),
         })
     return result
@@ -1033,6 +1057,7 @@ def restore_backup(name: str, progress: Progress | None = None) -> dict[str, Any
     backup = _safe_backup_path(name)
     validate_backup(backup)
     restored: list[str] = []
+    skipped: list[str] = []
     mappings = [
         (backup / "custom_components/switch_vision", COMPONENT_DIR, "Custom component"),
         (backup / "www/switch-vision", FRONTEND_DIR, "Dashboard frontend"),
@@ -1059,9 +1084,12 @@ def restore_backup(name: str, progress: Progress | None = None) -> dict[str, Any
     if unifi2mqtt_options_file.is_file():
         options = json.loads(unifi2mqtt_options_file.read_text(encoding="utf-8"))
         if isinstance(options, dict):
-            if progress: progress("Restoring UniFi2MQTT configuration…", 90)
-            set_unifi2mqtt_options(options)
-            restored.append("UniFi2MQTT configuration")
+            if unifi2mqtt_options_configured(options):
+                if progress: progress("Restoring UniFi2MQTT configuration…", 90)
+                set_unifi2mqtt_options(options)
+                restored.append("UniFi2MQTT configuration")
+            else:
+                skipped.append("UniFi2MQTT configuration (backup contains unconfigured defaults)")
     generated_yaml = backup / "share" / "switch_vision" / "generated-snmp2mqtt.yaml"
     if generated_yaml.is_file():
         GENERATED_SNMP2MQTT_YAML.parent.mkdir(parents=True, exist_ok=True)
@@ -1076,7 +1104,7 @@ def restore_backup(name: str, progress: Progress | None = None) -> dict[str, Any
     if "SNMP2MQTT configuration" in restored or "Generated SNMP2MQTT YAML" in restored: actions.append("Restart Switch Vision SNMP2MQTT")
     if "UniFi2MQTT configuration" in restored: actions.append("Restart Switch Vision UniFi2MQTT if it is running")
     if "Dashboard frontend" in restored: actions.append("Hard-refresh the browser")
-    return {"ok": True, "backup": name, "restored": restored, "required_actions": actions, "completed_at": datetime.now(timezone.utc).isoformat()}
+    return {"ok": True, "backup": name, "restored": restored, "skipped": skipped, "required_actions": actions, "completed_at": datetime.now(timezone.utc).isoformat()}
 
 
 def collect_custom_assets() -> dict[str, dict[str, bytes]]:

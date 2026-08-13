@@ -43,6 +43,6 @@ jobs:
 
       - name: Validate release metadata
         run: |
-          grep -F 'version: "2.1.8"' switch_vision_installer/config.yaml
-          grep -F 'INSTALLER_VERSION = "2.1.8"' switch_vision_installer/app/installer.py
-          grep -F '## v2.1.8' switch_vision_installer/CHANGELOG.md
+          grep -F 'version: "2.1.9"' switch_vision_installer/config.yaml
+          grep -F 'INSTALLER_VERSION = "2.1.9"' switch_vision_installer/app/installer.py
+          grep -F '## v2.1.9' switch_vision_installer/CHANGELOG.md

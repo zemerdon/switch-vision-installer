@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.1.9
+
+- Fixes restore failure when optional UniFi2MQTT is installed but has never been configured.
+- Treats Supervisor's default `site_id: null` / `api_key: null` UniFi options as unconfigured rather than as a restorable configuration.
+- New backups omit unconfigured UniFi2MQTT defaults and record that UniFi configuration was skipped because setup is incomplete.
+- Existing v2.1.8 backups containing unconfigured UniFi defaults remain valid and now restore successfully; the invalid UniFi option payload is skipped while the rest of the backup continues.
+- Extends the repository backup regression test to cover both configured UniFi options and the exact unconfigured-default failure case found during live HaOS testing.
+
 ## v2.1.8
 
 - Converts Installer backup/restore to the repository-managed app model.
