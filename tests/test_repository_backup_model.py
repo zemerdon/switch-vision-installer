@@ -18,7 +18,25 @@ mod = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = mod
 spec.loader.exec_module(mod)
 
-assert mod.INSTALLER_VERSION == "2.1.10"
+assert mod.INSTALLER_VERSION == "2.1.11"
+
+blank_switch = {
+    "switch_name": "",
+    "switch_host": "",
+    "sensor_prefix": "",
+    "snmp_community": "readonly",
+    "walk_mode": "targeted",
+    "switch_model": "auto",
+    "card_header_title": "",
+}
+real_switch = {
+    "switch_name": "SW1",
+    "switch_host": "192.0.2.1",
+}
+assert mod.configured_switch_count({"switches": [blank_switch]}) == 0
+assert mod.configured_switch_count({"switches": [blank_switch, real_switch]}) == 1
+assert mod.configured_switch_count({"devices": [{"name": "legacy"}]}) == 1
+
 
 source = INSTALLER.read_text(encoding="utf-8")
 web_source = INSTALLER_JS.read_text(encoding="utf-8")
