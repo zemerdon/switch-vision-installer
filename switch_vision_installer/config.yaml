@@ -1,7 +1,7 @@
 name: Switch Vision Installer
-version: "2.1.13"
+version: "2.1.14"
 slug: switch_vision_installer
-description: Install and update Switch Vision from the official public release repository.
+description: Install and update every Switch Vision component from the official repositories.
 url: https://github.com/zemerdon/switch-vision-installer
 arch:
   - aarch64

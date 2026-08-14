@@ -8,4 +8,4 @@ export SV_INSTALLER_BACKUPS=/share/switch-vision-backups
 export SV_INSTALLER_WEB=/opt/switch-vision-installer/www
 mkdir -p "$SV_INSTALLER_WORK" "$SV_INSTALLER_BACKUPS"
 
-exec python3 /opt/switch-vision-installer/app/web.py
+exec python3 /opt/switch-vision-installer/app/web_manager.py

@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.1.14
+
+- Adds a central Switch Vision component manager to the Installer.
+- Shows Switch Vision Core, Discovery, SNMP2MQTT, UniFi2MQTT, and Installer as independently versioned components.
+- Keeps a **Changelog** button permanently visible for every component, including components that are already current.
+- Adds per-component **Install/Update** actions through the Installer instead of requiring users to manage component repositories directly.
+- Adds dependency-aware **Update All** in the safe order Core → Discovery → SNMP2MQTT → UniFi2MQTT → Installer.
+- Protects Discovery v2.1.7+ from updating on Core versions older than v2.1.5; Update All upgrades Core first when a compatible Core release is available.
+- Keeps optional UniFi2MQTT opt-in: Update All updates it only when it is already installed.
+- Adds repository-name migration compatibility so old and new repository URLs can coexist during the rename.
+- Defines the target component repository names `switch-vision-core`, `switch-vision-discovery`, `switch-vision-snmp2mqtt`, `switch-vision-unifi2mqtt`, and `switch-vision-installer`.
+- Prevents the current SNMP2MQTT engine repository from being mistaken for the Home Assistant app repository by requiring the expected app `config.yaml` layout before selecting a repository.
+- Keeps the existing Core backup/checksum/rollback path and Supervisor-managed app configuration preservation unchanged.
+
 ## v2.1.13
 
 - Improves Discovery migration failure guidance during Switch Vision upgrades.
