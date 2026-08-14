@@ -16,7 +16,7 @@ function componentVersionText(row){
 }
 
 function managedComponentAction(row){
-  if(row.id==='installer'&&row.update_available)return'Update';
+  if(row.id==='installer'&&row.update_available)return'Update in Home Assistant';
   if(!row.installed&&!row.optional)return'Install';
   if(!row.installed&&row.optional)return'Install';
   if(row.update_available)return'Update';
@@ -41,11 +41,11 @@ function renderManagedComponents(){
       <strong class="managed-component-state ${cls}">${esc(status)}</strong>
       <div class="managed-component-actions">
         <button class="secondary component-changelog" type="button" data-component="${esc(row.id)}">Changelog</button>
-        ${action?`<button class="component-update" type="button" data-component="${esc(row.id)}" ${(!row.dependency_ok&&row.id==='discovery')?'disabled':''}>${esc(action)}</button>`:''}
+        ${action?`<button class="${row.id==='installer'?'component-external-update':'component-update'}" type="button" data-component="${esc(row.id)}" ${(!row.dependency_ok&&row.id==='discovery')?'disabled':''}>${esc(action)}</button>`:''}
       </div>
     </div>`;
   }).join('');
-  const actionable=rows.filter(row=>row.update_available||(!row.installed&&!row.optional&&row.id!=='installer'));
+  const actionable=rows.filter(row=>(row.update_available&&row.id!=='installer')||(!row.installed&&!row.optional&&row.id!=='installer'));
   const updateAll=$('update-all-components');
   if(updateAll){
     const blocked=Boolean(managedComponentSnapshot?.update_all_blocked);
@@ -58,7 +58,7 @@ function renderManagedComponents(){
     if(managedComponentSnapshot?.update_all_blocked){
       note.innerHTML=`<b>Update All blocked:</b> ${esc(managedComponentSnapshot.update_all_blocked_reason)}`;
     }else{
-      note.textContent='Update All uses the safe dependency order: Core → Discovery → SNMP2MQTT → UniFi2MQTT → Installer. Optional UniFi2MQTT is never installed automatically.';
+      note.textContent='Update All uses the safe dependency order: Core → Discovery → SNMP2MQTT → UniFi2MQTT. Optional UniFi2MQTT is never installed automatically. Installer updates are applied from Home Assistant Settings → Apps.';
     }
   }
 }
@@ -104,6 +104,8 @@ refresh=async function(showLast=true){
 $('components').addEventListener('click',event=>{
   const changelog=event.target.closest('.component-changelog');
   if(changelog){openComponentChangelog(changelog.dataset.component);return;}
+  const external=event.target.closest('.component-external-update');
+  if(external){showResult('Update Switch Vision Installer from Home Assistant Settings → Apps → Switch Vision Installer. The running Installer cannot safely replace itself.','muted');return;}
   const update=event.target.closest('.component-update');
   if(update){requestComponentUpdate(update.dataset.component);}
 });

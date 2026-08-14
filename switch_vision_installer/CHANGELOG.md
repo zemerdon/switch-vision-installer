@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.1.16
+
+- Prevents the running Installer from attempting to update its own Home Assistant app through Supervisor.
+- Changes the Installer update action to **Update in Home Assistant** instead of issuing a self-update API request.
+- Removes Installer from the executable **Update All** order and count.
+- Keeps Installer version detection and its always-visible Changelog in the component manager.
+- Adds a final required action when an Installer update is available after Update All.
+- Makes the backend Installer update endpoint a safe no-op with Home Assistant App Store guidance, protecting against stale/cached frontends.
+- Adds regression coverage for self-update safety.
+
 ## v2.1.15
 
 - Marks an installed component as **Needs attention** when its minimum Switch Vision Core dependency is not satisfied instead of incorrectly showing **Up to date**.

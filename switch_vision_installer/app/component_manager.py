@@ -285,6 +285,11 @@ def _component_status(spec: ComponentSpec) -> dict[str, Any]:
         "dependency_ok": dependency_ok,
         "dependency_note": dependency_note,
         "remote_error": remote_error,
+        "external_update": spec.kind == "installer",
+        "update_hint": (
+            "Update from Home Assistant Settings → Apps"
+            if spec.kind == "installer" else None
+        ),
     }
 
 
@@ -293,7 +298,7 @@ def component_status() -> dict[str, Any]:
     by_id = {row["id"]: row for row in rows}
     actionable = [
         row for row in rows
-        if row["update_available"]
+        if (row["update_available"] and row["id"] != "installer")
         or (not row["installed"] and not row["optional"] and row["id"] != "installer")
     ]
     blocked_reason = None
@@ -313,14 +318,16 @@ def component_status() -> dict[str, Any]:
                 f"published Core is v{core_latest or 'unavailable'}. Publish/update Core first."
             )
     # Optional UniFi2MQTT is never installed by Update All when the user has not
-    # opted into it. Installer self-update is supported, but scheduled last.
+    # opted into it. The running Installer cannot safely replace itself; its
+    # update remains visible but Home Assistant must perform that app update.
     return {
         "components": rows,
         "updates_available": len([row for row in rows if row["update_available"]]),
         "actions_available": len(actionable),
         "update_all_blocked": bool(blocked_reason),
         "update_all_blocked_reason": blocked_reason,
-        "update_order": ["core", "discovery", "snmp2mqtt", "unifi2mqtt", "installer"],
+        "update_order": ["core", "discovery", "snmp2mqtt", "unifi2mqtt"],
+        "installer_update_external": True,
     }
 
 
@@ -495,35 +502,23 @@ def _installer_slug() -> str:
 
 
 def _installer_update(progress: Progress | None = None) -> dict[str, Any]:
-    installer_core.reload_addon_store()
-    slug = _installer_slug()
-    info = installer_core.addon_info(slug)
-    latest = installer_core.normalise_version(info.get("version_latest"))
-    current = installer_core.normalise_version(info.get("version"))
-    if latest and current and compare_versions(current, latest) >= 0 and not info.get("update_available"):
-        return {
-            "ok": True,
-            "version": current,
-            "installed": [],
-            "unchanged": ["Switch Vision Installer"],
-            "required_actions": [],
-            "component_update": "installer",
-        }
+    status = _component_status(_spec("installer"))
+    current = installer_core.normalise_version(status.get("installed_version"))
+    latest = installer_core.normalise_version(status.get("latest_version"))
     if progress:
-        progress(f"Scheduling Installer update to v{latest or 'latest'}…", 99)
-    installer_core.supervisor_request(
-        f"/store/addons/{slug}/update",
-        method="POST",
-        payload={"backup": False, "background": True},
-    )
+        progress("Installer update must be completed from Home Assistant Apps.", 100)
     return {
         "ok": True,
-        "version": latest or current,
-        "installed": ["Switch Vision Installer update scheduled"],
-        "unchanged": [],
-        "required_actions": ["The Installer will restart automatically; reopen this page if it disconnects."],
+        "version": current,
+        "installed": [],
+        "unchanged": ["Switch Vision Installer"],
+        "required_actions": (
+            [f"Update Switch Vision Installer to v{latest} from Home Assistant Settings → Apps."]
+            if latest and compare_versions(current, latest) < 0
+            else []
+        ),
         "component_update": "installer",
-        "self_update_scheduled": True,
+        "self_update_external": True,
     }
 
 
@@ -558,7 +553,7 @@ def update_all(progress: Progress | None = None) -> dict[str, Any]:
     warnings: list[str] = []
     required_actions: list[str] = []
 
-    ordered = ["core", "discovery", "snmp2mqtt", "unifi2mqtt", "installer"]
+    ordered = ["core", "discovery", "snmp2mqtt", "unifi2mqtt"]
     for index, component_id in enumerate(ordered):
         row = rows[component_id]
         # Optional UniFi2MQTT is not implicitly installed by Update All.
@@ -591,6 +586,14 @@ def update_all(progress: Progress | None = None) -> dict[str, Any]:
             unchanged.append(row["label"])
         warnings.extend(result.get("warnings") or [])
         required_actions.extend(result.get("required_actions") or [])
+
+    installer_row = rows.get("installer", {})
+    if installer_row.get("update_available"):
+        latest_installer = installer_row.get("latest_version")
+        required_actions.append(
+            f"Update Switch Vision Installer to v{latest_installer} from Home Assistant Settings → Apps."
+        )
+        unchanged.append("Switch Vision Installer (update available in Home Assistant)")
 
     clear_cache()
     return {
