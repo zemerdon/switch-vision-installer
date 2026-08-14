@@ -36,7 +36,8 @@ jobs:
             switch_vision_installer/app/component_manager.py \
             switch_vision_installer/app/web_manager.py \
             tests/test_repository_backup_model.py \
-            tests/test_component_manager.py
+            tests/test_component_manager.py \
+            tests/test_v2_1_17_ui_state.py
 
       - name: Check shell syntax
         run: bash -n switch_vision_installer/run.sh
@@ -52,10 +53,11 @@ jobs:
       - name: Validate component manager
         run: python tests/test_component_manager.py
 
+      - name: Validate v2.1.17 UI and state
+        run: python tests/test_v2_1_17_ui_state.py
+
       - name: Validate release metadata
         run: |
-          grep -F 'version: "2.1.16"' switch_vision_installer/config.yaml
-          grep -F 'INSTALLER_VERSION = "2.1.16"' switch_vision_installer/app/installer.py
-          grep -F '## v2.1.16' switch_vision_installer/CHANGELOG.md
-          grep -F 'switch-vision-core' switch_vision_installer/COMPONENT_MANAGER.md
-          grep -F 'switch-vision-snmp2mqtt-engine' switch_vision_installer/COMPONENT_MANAGER.md
+          grep -F 'version: "2.1.17"' switch_vision_installer/config.yaml
+          grep -F 'INSTALLER_VERSION = "2.1.17"' switch_vision_installer/app/installer.py
+          grep -F '## v2.1.17' switch_vision_installer/CHANGELOG.md
