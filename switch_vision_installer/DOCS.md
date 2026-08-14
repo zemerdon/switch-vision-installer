@@ -16,13 +16,13 @@ The Installer repository is the only repository users need to add manually. Disc
 
 ## Updates
 
-The Installer checks the public GitHub Latest release and selects an asset matching `switch-vision-*.zip`. It compares the available Switch Vision version with the installed integration version and offers an update or reinstall as appropriate.
+The Installer checks the public GitHub Latest release and requires the exact asset `switch-vision-<version>.zip` for that release tag. It compares the available Switch Vision version with the installed integration version and offers an update or reinstall as appropriate.
 
 Repository-managed apps version independently from the main Switch Vision release. Their source trees are not copied from the Switch Vision release ZIP.
 
 ## Safety and backups
 
-Before replacing managed Switch Vision files, the Installer can create and validate a backup. Published SHA-256 checksums are verified when available.
+Before replacing managed Switch Vision files, the Installer can create and validate a backup. Core install/update is refused unless a trusted SHA-256 is published through GitHub's release-asset digest or an explicit checksum asset.
 
 Current backups include:
 
@@ -34,7 +34,7 @@ Current backups include:
 - generated SNMP2MQTT YAML
 - calibration storage
 
-Repository-managed app source trees are deliberately excluded. Restore reapplies app options to the installed repository-backed apps rather than recreating local apps.
+Repository-managed app source trees are deliberately excluded. Restore reapplies app options to the installed repository-backed apps rather than recreating local apps. Restore is transactional: the Installer takes a private temporary safety snapshot and automatically rolls back files/settings if a restore step fails.
 
 Backups are stored under `/share/switch-vision-backups/`. Existing backups under `/share/switch_vision/installer_backups/` remain available for compatibility.
 

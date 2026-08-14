@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 import shutil
+import stat
 import tempfile
 import time
 import urllib.request
@@ -16,7 +17,7 @@ import urllib.error
 import zipfile
 import re
 
-INSTALLER_VERSION = "2.1.18"
+INSTALLER_VERSION = "2.1.19"
 OPTIONS_PATH = Path(os.environ.get("SV_INSTALLER_OPTIONS", "/data/options.json"))
 STATE_PATH = Path(os.environ.get("SV_INSTALLER_STATE", "/data/state.json"))
 WORK_DIR = Path(os.environ.get("SV_INSTALLER_WORK", "/data/work"))
@@ -111,6 +112,43 @@ def normalise_version(value: Any) -> str:
     return str(value or "").strip().lstrip("v")
 
 
+TRANSIENT_STORE_HTTP_CODES = {404, 409, 423, 429, 500, 502, 503, 504}
+
+
+def supervisor_store_request(
+    path: str,
+    *,
+    payload: dict[str, Any] | None = None,
+    attempts: int = 6,
+    delay: float = 5.0,
+    progress: Progress | None = None,
+) -> dict[str, Any]:
+    # Retry transient Supervisor App Store publication/image races.
+    last_error: Exception | None = None
+    for attempt in range(1, max(1, attempts) + 1):
+        try:
+            return supervisor_request(path, method="POST", payload=payload)
+        except Exception as exc:
+            last_error = exc
+            match = re.search(r"\bHTTP\s+(\d{3})\b", str(exc))
+            code = int(match.group(1)) if match else None
+            if code not in TRANSIENT_STORE_HTTP_CODES or attempt >= attempts:
+                break
+            if progress:
+                progress(
+                    f"Home Assistant App Store metadata is ahead of the published image; "
+                    f"retrying ({attempt}/{attempts})…",
+                    55,
+                )
+            time.sleep(delay * attempt)
+    raise RuntimeError(
+        "Home Assistant advertised the app version before the installable image "
+        "became available, or the App Store remained temporarily unavailable. "
+        "Wait about one minute and retry. Last error: "
+        + str(last_error)
+    ) from last_error
+
+
 def addon_info(slug: str) -> dict[str, Any]:
     payload = supervisor_request(f"/addons/{slug}/info")
     data = payload.get("data", {})
@@ -190,10 +228,10 @@ def reconcile_discovery_repository_app(
     if not installed_store:
         if progress:
             progress("Installing repository-backed Switch Vision Discovery…", 95)
-        supervisor_request(
+        supervisor_store_request(
             f"/store/addons/{store_slug}/install",
-            method="POST",
             payload={"background": False},
+            progress=progress,
         )
         installed_now = True
         current = wait_for_addon(store_slug, timeout=300)
@@ -206,10 +244,10 @@ def reconcile_discovery_repository_app(
         ):
             if progress:
                 progress(f"Updating Switch Vision Discovery to v{latest_version or 'latest'}…", 96)
-            supervisor_request(
+            supervisor_store_request(
                 f"/store/addons/{store_slug}/update",
-                method="POST",
                 payload={"backup": False, "background": False},
+                progress=progress,
             )
             updated = True
             current = wait_for_addon(
@@ -642,13 +680,21 @@ def install_supervisor_addon(kind: str) -> dict[str, Any]:
     else:
         raise RuntimeError(f"Unsupported add-on kind: {kind}")
     try:
-        result = supervisor_request(
+        result = supervisor_store_request(
             f"/store/addons/{slug}/install",
-            method="POST",
             payload={"background": False},
         )
-    except Exception:
-        result = supervisor_request(f"/addons/{slug}/install", method="POST")
+    except Exception as store_exc:
+        # Compatibility endpoint for Supervisor builds without the store endpoint.
+        # If it also fails, preserve the useful publication-race error from the
+        # primary App Store request instead of hiding it behind the fallback.
+        try:
+            result = supervisor_request(f"/addons/{slug}/install", method="POST")
+        except Exception as compatibility_exc:
+            raise RuntimeError(
+                f"{store_exc} Compatibility install endpoint also failed: "
+                f"{compatibility_exc}"
+            ) from store_exc
     return {"slug": slug, "supervisor": result}
 
 def find_release_snmp2mqtt_dir(root: Path) -> Path | None:
@@ -701,26 +747,65 @@ def latest_release() -> dict[str, Any]:
     payload = request_json(str(options["release_api_url"]))
     if payload.get("prerelease") and not options.get("allow_prerelease"):
         raise RuntimeError("Latest GitHub release is marked as a prerelease.")
+
+    version = normalise_version(payload.get("tag_name") or payload.get("name"))
+    if not version:
+        raise RuntimeError("Latest GitHub release does not contain a usable version tag.")
+
     pattern = str(options.get("release_asset_pattern") or "switch-vision-*.zip")
-    assets = [a for a in payload.get("assets", []) if fnmatch(str(a.get("name", "")), pattern)]
-    assets = [a for a in assets if "source" not in str(a.get("name", "")).lower()]
-    if not assets:
-        raise RuntimeError(f"No installable release asset matched {pattern!r}.")
-    asset = sorted(assets, key=lambda a: int(a.get("size", 0)), reverse=True)[0]
-    version = str(payload.get("tag_name") or payload.get("name") or "").strip().lstrip("v")
-    checksum_assets = [a for a in payload.get("assets", []) if str(a.get("name", "")).lower() in {"sha256sums.txt", "sha256sum.txt", "checksums.txt"} or str(a.get("name", "")).lower().endswith((".sha256", ".sha256sum"))]
+    matched = [
+        a for a in payload.get("assets", [])
+        if isinstance(a, dict)
+        and fnmatch(str(a.get("name", "")), pattern)
+        and "source" not in str(a.get("name", "")).lower()
+    ]
+    expected_name = f"switch-vision-{version}.zip"
+    exact = [a for a in matched if str(a.get("name") or "") == expected_name]
+    if len(exact) != 1:
+        names = ", ".join(sorted(str(a.get("name") or "") for a in matched)) or "none"
+        raise RuntimeError(
+            f"Release v{version} must contain exactly one installable asset named "
+            f"{expected_name!r}; matched assets: {names}."
+        )
+    asset = exact[0]
+
+    digest_text = str(asset.get("digest") or "").strip()
+    asset_digest = None
+    if digest_text:
+        match = re.fullmatch(r"sha256:([a-fA-F0-9]{64})", digest_text)
+        if not match:
+            raise RuntimeError(
+                f"Release asset {expected_name} published an unsupported digest {digest_text!r}."
+            )
+        asset_digest = match.group(1).lower()
+
+    asset_name_lower = expected_name.lower()
+    checksum_names = {
+        "sha256sums.txt",
+        "sha256sum.txt",
+        "checksums.txt",
+        f"{asset_name_lower}.sha256",
+        f"{asset_name_lower}.sha256sum",
+    }
+    checksum_assets = [
+        a for a in payload.get("assets", [])
+        if isinstance(a, dict)
+        and str(a.get("name", "")).lower() in checksum_names
+    ]
     checksum_asset = checksum_assets[0] if checksum_assets else None
     return {
-        "version": version, "name": payload.get("name") or payload.get("tag_name"),
-        "published_at": payload.get("published_at"), "asset_name": asset.get("name"),
-        "asset_url": asset.get("browser_download_url"), "asset_size": asset.get("size"),
+        "version": version,
+        "name": payload.get("name") or payload.get("tag_name"),
+        "published_at": payload.get("published_at"),
+        "asset_name": asset.get("name"),
+        "asset_url": asset.get("browser_download_url"),
+        "asset_size": asset.get("size"),
+        "asset_digest": asset_digest,
         "html_url": payload.get("html_url"),
         "changelog": payload.get("body") or "",
         "checksum_asset_name": checksum_asset.get("name") if checksum_asset else None,
         "checksum_asset_url": checksum_asset.get("browser_download_url") if checksum_asset else None,
     }
-
-
 
 def download_file(url: str, destination: Path, timeout: int = 120) -> None:
     request = urllib.request.Request(url, headers={"User-Agent": f"Switch-Vision-Installer/{INSTALLER_VERSION}"})
@@ -728,25 +813,60 @@ def download_file(url: str, destination: Path, timeout: int = 120) -> None:
         shutil.copyfileobj(response, output)
 
 
-def expected_release_checksum(release: dict[str, Any], work_dir: Path) -> str | None:
+def expected_release_checksum(release: dict[str, Any], work_dir: Path) -> str:
+    github_digest = str(release.get("asset_digest") or "").strip().lower() or None
+    checksum_digest: str | None = None
     url = release.get("checksum_asset_url")
-    if not url:
-        return None
-    checksum_file = work_dir / str(release.get("checksum_asset_name") or "SHA256SUMS.txt")
-    download_file(str(url), checksum_file, timeout=30)
-    text = checksum_file.read_text(encoding="utf-8", errors="replace")
-    asset_name = str(release.get("asset_name") or "")
-    for line in text.splitlines():
-        if asset_name and asset_name in line:
-            match = re.search(r"\b([a-fA-F0-9]{64})\b", line)
+    if url:
+        checksum_file = work_dir / str(
+            release.get("checksum_asset_name") or "SHA256SUMS.txt"
+        )
+        download_file(str(url), checksum_file, timeout=30)
+        text = checksum_file.read_text(encoding="utf-8", errors="replace")
+        asset_name = str(release.get("asset_name") or "")
+        for line in text.splitlines():
+            # GNU sha256sum format: <digest> [* ]<filename>
+            match = re.match(
+                r"^\s*([a-fA-F0-9]{64})\s+[* ]?(.+?)\s*$", line
+            )
+            if match and Path(match.group(2).strip()).name == asset_name:
+                checksum_digest = match.group(1).lower()
+                break
+            # BSD/OpenSSL format: SHA256 (<filename>) = <digest>
+            match = re.match(
+                r"^\s*SHA256\s*\((.+)\)\s*=\s*([a-fA-F0-9]{64})\s*$",
+                line,
+                flags=re.IGNORECASE,
+            )
+            if match and Path(match.group(1).strip()).name == asset_name:
+                checksum_digest = match.group(2).lower()
+                break
+        if (
+            checksum_digest is None
+            and str(release.get("checksum_asset_name", "")).lower().endswith(
+                (".sha256", ".sha256sum")
+            )
+        ):
+            match = re.search(r"\b([a-fA-F0-9]{64})\b", text)
             if match:
-                return match.group(1).lower()
-    if str(release.get("checksum_asset_name", "")).lower().endswith((".sha256", ".sha256sum")):
-        match = re.search(r"\b([a-fA-F0-9]{64})\b", text)
-        if match:
-            return match.group(1).lower()
-    raise RuntimeError(f"Checksum file does not contain an entry for {asset_name}.")
+                checksum_digest = match.group(1).lower()
+        if checksum_digest is None:
+            raise RuntimeError(
+                f"Checksum file does not contain an entry for {asset_name}."
+            )
 
+    if github_digest and checksum_digest and github_digest != checksum_digest:
+        raise RuntimeError(
+            "Release checksum sources disagree: GitHub asset digest "
+            f"{github_digest} != checksum asset {checksum_digest}."
+        )
+    expected = github_digest or checksum_digest
+    if not expected:
+        raise RuntimeError(
+            "Release does not publish a trusted SHA-256 digest. "
+            "Refusing to install an unverified asset."
+        )
+    return expected
 
 def path_writable(path: Path) -> bool:
     probe_parent = path if path.exists() and path.is_dir() else path.parent
@@ -765,39 +885,67 @@ def preflight_checks(release: dict[str, Any] | None = None) -> dict[str, Any]:
     checks: list[dict[str, Any]] = []
     def add(name: str, ok: bool, detail: str) -> None:
         checks.append({"name": name, "ok": bool(ok), "detail": detail})
-    add("Supervisor API", bool(SUPERVISOR_TOKEN), "Supervisor token available" if SUPERVISOR_TOKEN else "Supervisor token unavailable")
+    add(
+        "Supervisor API",
+        bool(SUPERVISOR_TOKEN),
+        "Supervisor token available" if SUPERVISOR_TOKEN else "Supervisor token unavailable",
+    )
     if SUPERVISOR_TOKEN:
         try:
             supervisor_request("/info")
-            checks[-1] = {"name": "Supervisor API", "ok": True, "detail": "Supervisor API responded successfully"}
+            checks[-1] = {
+                "name": "Supervisor API",
+                "ok": True,
+                "detail": "Supervisor API responded successfully",
+            }
         except Exception as exc:
             checks[-1] = {"name": "Supervisor API", "ok": False, "detail": str(exc)}
-    for label, path in (("Home Assistant configuration", HA_CONFIG), ("Local add-ons", ADDONS_DIR), ("Shared storage", SHARE_DIR), ("Installer work directory", WORK_DIR)):
+    for label, path in (
+        ("Home Assistant configuration", HA_CONFIG),
+        ("Local add-ons", ADDONS_DIR),
+        ("Shared storage", SHARE_DIR),
+        ("Installer work directory", WORK_DIR),
+    ):
         add(f"Writable: {label}", path_writable(path), str(path))
     usage = shutil.disk_usage(SHARE_DIR if SHARE_DIR.exists() else Path("/"))
     asset_size = int(release.get("asset_size") or 0)
     required = max(128 * 1024 * 1024, asset_size * 4)
-    add("Available disk space", usage.free >= required, f"{usage.free // (1024*1024)} MB free; {required // (1024*1024)} MB required")
-    add("Release asset", bool(release.get("asset_url") and release.get("asset_name")), str(release.get("asset_name") or "Missing"))
-    add("Published checksum", bool(release.get("checksum_asset_url")), str(release.get("checksum_asset_name") or "No checksum asset published; computed SHA-256 only"))
-    blocking = [c for c in checks if not c["ok"] and c["name"] != "Published checksum"]
+    add(
+        "Available disk space",
+        usage.free >= required,
+        f"{usage.free // (1024*1024)} MB free; {required // (1024*1024)} MB required",
+    )
+    expected_name = f"switch-vision-{normalise_version(release.get('version'))}.zip"
+    add(
+        "Release asset identity",
+        bool(release.get("asset_url") and release.get("asset_name") == expected_name),
+        str(release.get("asset_name") or "Missing"),
+    )
+    trusted = bool(release.get("asset_digest") or release.get("checksum_asset_url"))
+    add(
+        "Trusted SHA-256",
+        trusted,
+        (
+            "GitHub release asset digest"
+            if release.get("asset_digest")
+            else str(release.get("checksum_asset_name") or "No trusted checksum published")
+        ),
+    )
+    blocking = [c for c in checks if not c["ok"]]
     return {"ok": not blocking, "checks": checks, "release": release}
 
-
 def installed_version() -> str | None:
+    # Return Core's version only; Discovery has an independent version stream.
     manifest = COMPONENT_DIR / "manifest.json"
     if manifest.exists():
         try:
-            return str(json.loads(manifest.read_text(encoding="utf-8")).get("version") or "") or None
+            value = str(
+                json.loads(manifest.read_text(encoding="utf-8")).get("version") or ""
+            ).strip()
+            return value or None
         except (OSError, json.JSONDecodeError):
             pass
-    config = DISCOVERY_DIR / "config.yaml"
-    if config.exists():
-        for line in config.read_text(encoding="utf-8", errors="ignore").splitlines():
-            if line.startswith("version:"):
-                return line.split(":", 1)[1].strip().strip('"\'')
     return None
-
 
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -870,6 +1018,28 @@ def backup_file_hashes(path: Path) -> dict[str, str]:
     return hashes
 
 
+def secure_backup_permissions(path: Path) -> None:
+    # Supervisor option files inside backups may contain credentials. Fail closed
+    # if owner-only permissions cannot be applied and verified.
+    entries = [path, *path.rglob("*")]
+    for entry in entries:
+        if entry.is_symlink():
+            raise RuntimeError(f"Backup contains unsupported symbolic link: {entry}")
+        mode = 0o700 if entry.is_dir() else 0o600
+        try:
+            entry.chmod(mode)
+            observed = stat.S_IMODE(entry.stat().st_mode)
+        except OSError as exc:
+            raise RuntimeError(
+                f"Could not secure backup permissions for {entry}: {exc}"
+            ) from exc
+        if observed != mode:
+            raise RuntimeError(
+                f"Backup permission verification failed for {entry}: "
+                f"expected {oct(mode)}, observed {oct(observed)}."
+            )
+
+
 def validate_backup(path: Path) -> dict[str, Any]:
     manifest_path = path / "backup-manifest.json"
     if not manifest_path.is_file():
@@ -881,7 +1051,9 @@ def validate_backup(path: Path) -> dict[str, Any]:
             "installed_version": None,
             "files": backup_file_hashes(path),
         }
-        manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+        manifest_path.write_text(
+            json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+        )
     else:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     expected = manifest.get("files")
@@ -897,11 +1069,15 @@ def validate_backup(path: Path) -> dict[str, Any]:
             mismatched.append(relative)
     if missing or mismatched:
         detail = []
-        if missing: detail.append("missing: " + ", ".join(missing[:10]))
-        if mismatched: detail.append("checksum mismatch: " + ", ".join(mismatched[:10]))
-        raise RuntimeError("Backup validation failed (" + "; ".join(detail) + ").")
+        if missing:
+            detail.append("missing: " + ", ".join(missing[:10]))
+        if mismatched:
+            detail.append("checksum mismatch: " + ", ".join(mismatched[:10]))
+        raise RuntimeError(
+            "Backup validation failed (" + "; ".join(detail) + ")."
+        )
+    secure_backup_permissions(path)
     return {"ok": True, "file_count": len(expected), "manifest": manifest}
-
 
 def prune_backups() -> dict[str, Any]:
     keep = max(1, int(load_options().get("backup_retention", 5)))
@@ -926,6 +1102,7 @@ def create_backup(force: bool = False) -> Path | None:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
     target = BACKUP_DIR / f"switch-vision-{stamp}"
     target.mkdir(parents=True, exist_ok=False)
+    target.chmod(0o700)
     copy_backup(COMPONENT_DIR, target, "custom_components/switch_vision")
     copy_backup(FRONTEND_DIR, target, "www/switch-vision")
     discovery_options = get_discovery_options()
@@ -1070,7 +1247,7 @@ def replace_tree(source: Path, destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True); shutil.copytree(source, destination)
 
 
-def restore_backup(name: str, progress: Progress | None = None) -> dict[str, Any]:
+def _restore_backup_contents(name: str, progress: Progress | None = None) -> dict[str, Any]:
     backup = _safe_backup_path(name)
     validate_backup(backup)
     restored: list[str] = []
@@ -1123,6 +1300,130 @@ def restore_backup(name: str, progress: Progress | None = None) -> dict[str, Any
     if "UniFi2MQTT configuration" in restored: actions.append("Restart Switch Vision UniFi2MQTT if it is running")
     if "Dashboard frontend" in restored: actions.append("Hard-refresh the browser")
     return {"ok": True, "backup": name, "restored": restored, "skipped": skipped, "required_actions": actions, "completed_at": datetime.now(timezone.utc).isoformat()}
+
+
+def _capture_restore_snapshot(path: Path) -> dict[str, Any]:
+    path.mkdir(parents=True, exist_ok=True)
+    path.chmod(0o700)
+    meta = {
+        "component_present": COMPONENT_DIR.is_dir(),
+        "frontend_present": FRONTEND_DIR.is_dir(),
+        "generated_yaml_present": GENERATED_SNMP2MQTT_YAML.is_file(),
+        "calibration_present": (
+            HA_CONFIG / ".storage" / "switch_vision_calibrations"
+        ).is_file(),
+    }
+    copy_backup(COMPONENT_DIR, path, "custom_components/switch_vision")
+    copy_backup(FRONTEND_DIR, path, "www/switch-vision")
+
+    for filename, getter, status_getter, label in (
+        (
+            "discovery-options.json",
+            get_discovery_options,
+            discovery_status,
+            "Discovery",
+        ),
+        (
+            "snmp2mqtt-options.json",
+            get_snmp2mqtt_options,
+            snmp2mqtt_status,
+            "SNMP2MQTT",
+        ),
+        (
+            "unifi2mqtt-options.json",
+            get_unifi2mqtt_options,
+            unifi2mqtt_status,
+            "UniFi2MQTT",
+        ),
+    ):
+        status = status_getter()
+        installed = bool(status.get("installed")) if isinstance(status, dict) else False
+        options = getter()
+        if installed and not isinstance(options, dict):
+            raise RuntimeError(
+                f"Cannot start transactional restore because current {label} "
+                "options could not be captured safely."
+            )
+        if isinstance(options, dict):
+            (path / filename).write_text(
+                json.dumps(options, indent=2) + "\n", encoding="utf-8"
+            )
+
+    if GENERATED_SNMP2MQTT_YAML.is_file():
+        target = path / "share" / "switch_vision" / GENERATED_SNMP2MQTT_YAML.name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(GENERATED_SNMP2MQTT_YAML, target)
+
+    calibration = HA_CONFIG / ".storage" / "switch_vision_calibrations"
+    if calibration.is_file():
+        target = path / ".storage" / calibration.name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(calibration, target)
+
+    secure_backup_permissions(path)
+    return meta
+
+
+def _rollback_restore_snapshot(path: Path, meta: dict[str, Any]) -> None:
+    for present_key, source, destination in (
+        ("component_present", path / "custom_components" / "switch_vision", COMPONENT_DIR),
+        ("frontend_present", path / "www" / "switch-vision", FRONTEND_DIR),
+    ):
+        if meta.get(present_key) and source.is_dir():
+            replace_tree(source, destination)
+        elif not meta.get(present_key) and destination.exists():
+            shutil.rmtree(destination)
+
+    for filename, setter in (
+        ("discovery-options.json", lambda value: set_discovery_options(value)),
+        ("snmp2mqtt-options.json", set_snmp2mqtt_options),
+        ("unifi2mqtt-options.json", set_unifi2mqtt_options),
+    ):
+        source = path / filename
+        if source.is_file():
+            value = json.loads(source.read_text(encoding="utf-8"))
+            if isinstance(value, dict):
+                setter(value)
+
+    snapshot_yaml = path / "share" / "switch_vision" / "generated-snmp2mqtt.yaml"
+    if meta.get("generated_yaml_present") and snapshot_yaml.is_file():
+        GENERATED_SNMP2MQTT_YAML.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(snapshot_yaml, GENERATED_SNMP2MQTT_YAML)
+    elif not meta.get("generated_yaml_present") and GENERATED_SNMP2MQTT_YAML.exists():
+        GENERATED_SNMP2MQTT_YAML.unlink()
+
+    calibration = HA_CONFIG / ".storage" / "switch_vision_calibrations"
+    snapshot_calibration = path / ".storage" / "switch_vision_calibrations"
+    if meta.get("calibration_present") and snapshot_calibration.is_file():
+        calibration.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(snapshot_calibration, calibration)
+    elif not meta.get("calibration_present") and calibration.exists():
+        calibration.unlink()
+
+
+def restore_backup(name: str, progress: Progress | None = None) -> dict[str, Any]:
+    backup = _safe_backup_path(name)
+    validate_backup(backup)
+    WORK_DIR.mkdir(parents=True, exist_ok=True)
+    safety = Path(tempfile.mkdtemp(prefix="restore-safety-", dir=WORK_DIR))
+    meta = _capture_restore_snapshot(safety)
+    try:
+        result = _restore_backup_contents(name, progress)
+        result["transactional_restore"] = True
+        return result
+    except Exception as exc:
+        try:
+            _rollback_restore_snapshot(safety, meta)
+        except Exception as rollback_exc:
+            raise RuntimeError(
+                f"Restore failed: {exc}. Automatic safety rollback also failed: {rollback_exc}"
+            ) from exc
+        raise RuntimeError(
+            f"Restore failed: {exc}. Previous files/settings were restored from "
+            "the temporary safety snapshot."
+        ) from exc
+    finally:
+        shutil.rmtree(safety, ignore_errors=True)
 
 
 def collect_custom_assets() -> dict[str, dict[str, bytes]]:
@@ -1203,29 +1504,62 @@ def install_release(root: Path, version: str, checksum: str, progress: Progress 
 
 
 def prepare_release(progress: Progress | None = None) -> tuple[dict[str, Any], Path, Path, str, bool]:
-    if progress: progress("Checking the latest public release…", 5)
+    if progress:
+        progress("Checking the latest public release…", 5)
     release = latest_release()
     report = preflight_checks(release)
     if not report["ok"]:
-        failed = "; ".join(c["name"] + ": " + c["detail"] for c in report["checks"] if not c["ok"] and c["name"] != "Published checksum")
+        failed = "; ".join(
+            c["name"] + ": " + c["detail"] for c in report["checks"] if not c["ok"]
+        )
         raise RuntimeError("Preflight checks failed: " + failed)
     WORK_DIR.mkdir(parents=True, exist_ok=True)
     tmp_path = Path(tempfile.mkdtemp(dir=WORK_DIR))
     archive = tmp_path / str(release["asset_name"])
-    if progress: progress(f"Downloading {release['asset_name']}…", 18)
+    if progress:
+        progress(f"Downloading {release['asset_name']}…", 18)
     download_file(str(release["asset_url"]), archive)
-    if archive.stat().st_size <= 0:
+
+    expected_size = int(release.get("asset_size") or 0)
+    actual_size = archive.stat().st_size
+    if actual_size <= 0:
         raise RuntimeError("Downloaded release archive is empty.")
-    if progress: progress("Verifying checksum and archive structure…", 35)
+    if expected_size and actual_size != expected_size:
+        raise RuntimeError(
+            f"Release asset size mismatch: expected {expected_size} bytes, "
+            f"received {actual_size} bytes."
+        )
+
+    if progress:
+        progress("Verifying trusted SHA-256 and release identity…", 35)
     actual = sha256(archive)
     expected = expected_release_checksum(release, tmp_path)
-    if expected and actual != expected:
-        raise RuntimeError(f"Release checksum mismatch: expected {expected}, received {actual}.")
-    extracted = tmp_path / "extracted"; extracted.mkdir()
+    if actual != expected:
+        raise RuntimeError(
+            f"Release checksum mismatch: expected {expected}, received {actual}."
+        )
+
+    extracted = tmp_path / "extracted"
+    extracted.mkdir()
     safe_extract(archive, extracted)
     root = find_release_root(extracted)
-    return release, tmp_path, root, actual, bool(expected)
 
+    manifest = root / "custom_components" / "switch_vision" / "manifest.json"
+    if not manifest.is_file():
+        raise RuntimeError("Release ZIP is missing the Switch Vision Core manifest.")
+    try:
+        payload_version = normalise_version(
+            json.loads(manifest.read_text(encoding="utf-8")).get("version")
+        )
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError("Release Core manifest is unreadable.") from exc
+    expected_version = normalise_version(release.get("version"))
+    if payload_version != expected_version:
+        raise RuntimeError(
+            f"Release identity mismatch: GitHub tag is v{expected_version}, "
+            f"but the packaged Core manifest is v{payload_version or 'unknown'}."
+        )
+    return release, tmp_path, root, actual, True
 
 def dry_run(progress: Progress | None = None) -> dict[str, Any]:
     release, tmp_path, root, checksum, checksum_verified = prepare_release(progress)

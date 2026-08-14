@@ -216,15 +216,72 @@ def request_core_restart_async() -> None:
         traceback.print_exc()
 
 
-def run_job(kind: str, fn) -> None:
-    if not operation_lock.acquire(blocking=False): return
-    operation.update(active=True, kind=kind, message="Starting…", percent=1, result=None, error=None)
+class OperationBusyError(RuntimeError):
+    pass
+
+
+def _reserve_operation(kind: str) -> bool:
+    if not operation_lock.acquire(blocking=False):
+        return False
+    operation.update(
+        active=True, kind=kind, message="Starting…", percent=1, result=None, error=None
+    )
+    return True
+
+
+def _finish_operation() -> None:
+    operation["active"] = False
+    operation_lock.release()
+
+
+def _run_reserved_job(kind: str, fn) -> None:
     try:
         result = fn()
         operation["result"] = asdict(result) if is_dataclass(result) else result
         operation["percent"] = 100
-    except Exception as exc: traceback.print_exc(); operation["error"] = str(exc); operation["message"] = f"{kind.title()} failed."
-    finally: operation["active"] = False; operation_lock.release()
+    except Exception as exc:
+        traceback.print_exc()
+        operation["error"] = str(exc)
+        operation["message"] = f"{kind.title()} failed."
+    finally:
+        _finish_operation()
+
+
+def start_job(kind: str, fn) -> bool:
+    # Reserve the mutation slot before returning HTTP 202.
+    if not _reserve_operation(kind):
+        return False
+    try:
+        threading.Thread(
+            target=_run_reserved_job, args=(kind, fn), daemon=True
+        ).start()
+    except Exception:
+        _finish_operation()
+        raise
+    return True
+
+
+def run_job(kind: str, fn) -> None:
+    # Compatibility entry point used by older callers.
+    if not _reserve_operation(kind):
+        return
+    _run_reserved_job(kind, fn)
+
+
+def run_locked(kind: str, fn):
+    if not _reserve_operation(kind):
+        raise OperationBusyError("Another installer operation is already running.")
+    try:
+        result = fn()
+        operation["result"] = asdict(result) if is_dataclass(result) else result
+        operation["percent"] = 100
+        return result
+    except Exception as exc:
+        operation["error"] = str(exc)
+        operation["message"] = f"{kind.title()} failed."
+        raise
+    finally:
+        _finish_operation()
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -249,54 +306,70 @@ class Handler(BaseHTTPRequestHandler):
             types={".html":"text/html; charset=utf-8",".js":"application/javascript; charset=utf-8",".css":"text/css; charset=utf-8"}; data=target.read_bytes(); self.send_response(200); self.send_header("Content-Type",types.get(target.suffix,"text/plain")); self.send_header("Cache-Control","no-store"); self.send_header("Content-Length",str(len(data))); self.end_headers(); self.wfile.write(data)
         except Exception as exc: self.send_json({"ok":False,"error":str(exc)},500)
     def do_POST(self) -> None:
-        path=self.path.split("?",1)[0]
+        path = self.path.split("?", 1)[0]
         try:
-            if path=="/api/install":
-                if operation["active"]: return self.send_json({"ok":False,"error":"Another installer operation is already running."},409)
-                threading.Thread(target=run_job,args=("install",install_switch_vision),daemon=True).start(); return self.send_json({"ok":True,"started":True},202)
-            if path=="/api/dry-run":
-                if operation["active"]: return self.send_json({"ok":False,"error":"Another installer operation is already running."},409)
-                threading.Thread(target=run_job,args=("dry run",lambda:dry_run(set_progress)),daemon=True).start(); return self.send_json({"ok":True,"started":True},202)
-            if path=="/api/create-backup":
-                if operation["active"]: return self.send_json({"ok":False,"error":"Another installer operation is already running."},409)
-                threading.Thread(target=run_job,args=("backup",lambda:create_manual_backup(set_progress)),daemon=True).start(); return self.send_json({"ok":True,"started":True},202)
-            if path=="/api/validate-backup":
-                payload=self.body(); name=str(payload.get("name") or "")
-                if operation["active"]: return self.send_json({"ok":False,"error":"Another installer operation is already running."},409)
-                threading.Thread(target=run_job,args=("backup validation",lambda:validate_named_backup(name,set_progress)),daemon=True).start(); return self.send_json({"ok":True,"started":True},202)
-            if path=="/api/restore":
-                payload=self.body(); name=str(payload.get("name") or "")
-                if operation["active"]: return self.send_json({"ok":False,"error":"Another installer operation is already running."},409)
-                threading.Thread(target=run_job,args=("restore",lambda:restore_backup(name,set_progress)),daemon=True).start(); return self.send_json({"ok":True,"started":True},202)
-            if path=="/api/delete-backup": return self.send_json(delete_backup(str(self.body().get("name") or "")))
-            if path=="/api/prune-backups": return self.send_json(apply_backup_retention())
-            if path=="/api/restart-core":
-                threading.Thread(target=request_core_restart_async, daemon=True).start()
-                return self.send_json({"ok":True,"requested":True,"message":"Home Assistant Core restart requested."},202)
-            if path=="/api/install-discovery":
-                repository = ensure_discovery_repository()
-                result = reconcile_discovery_repository_app(str(repository.get("slug") or ""))
-                return self.send_json({"ok":True,"requested":True,**result})
-            if path=="/api/restart-discovery":
-                result = supervisor_request(f"/addons/{find_discovery_slug()}/restart")
-                return self.send_json({"ok":True,"requested":True,"supervisor":result})
-            if path=="/api/install-snmp2mqtt":
-                ensure_snmp2mqtt_repository()
-                result = install_supervisor_addon("snmp2mqtt")
-                return self.send_json({"ok":True,"requested":True,**result})
-            if path=="/api/restart-snmp2mqtt":
-                result = supervisor_request(f"/addons/{find_snmp2mqtt_slug()}/restart")
-                return self.send_json({"ok":True,"requested":True,"supervisor":result})
-            if path=="/api/install-unifi2mqtt":
-                ensure_unifi2mqtt_repository()
-                result = install_supervisor_addon("unifi2mqtt")
-                return self.send_json({"ok":True,"requested":True,**result})
-            if path=="/api/restart-unifi2mqtt":
-                result = supervisor_request(f"/addons/{find_unifi2mqtt_slug()}/restart")
-                return self.send_json({"ok":True,"requested":True,"supervisor":result})
+            if path == "/api/install":
+                if not start_job("install", install_switch_vision):
+                    return self.send_json({"ok": False, "error": "Another installer operation is already running."}, 409)
+                return self.send_json({"ok": True, "started": True}, 202)
+            if path == "/api/dry-run":
+                if not start_job("dry run", lambda: dry_run(set_progress)):
+                    return self.send_json({"ok": False, "error": "Another installer operation is already running."}, 409)
+                return self.send_json({"ok": True, "started": True}, 202)
+            if path == "/api/create-backup":
+                if not start_job("backup", lambda: create_manual_backup(set_progress)):
+                    return self.send_json({"ok": False, "error": "Another installer operation is already running."}, 409)
+                return self.send_json({"ok": True, "started": True}, 202)
+            if path == "/api/validate-backup":
+                payload = self.body()
+                name = str(payload.get("name") or "")
+                if not start_job("backup validation", lambda: validate_named_backup(name, set_progress)):
+                    return self.send_json({"ok": False, "error": "Another installer operation is already running."}, 409)
+                return self.send_json({"ok": True, "started": True}, 202)
+            if path == "/api/restore":
+                payload = self.body()
+                name = str(payload.get("name") or "")
+                if not start_job("restore", lambda: restore_backup(name, set_progress)):
+                    return self.send_json({"ok": False, "error": "Another installer operation is already running."}, 409)
+                return self.send_json({"ok": True, "started": True}, 202)
+            if path == "/api/delete-backup":
+                name = str(self.body().get("name") or "")
+                return self.send_json(run_locked("delete backup", lambda: delete_backup(name)))
+            if path == "/api/prune-backups":
+                return self.send_json(run_locked("prune backups", apply_backup_retention))
+            if path == "/api/restart-core":
+                if not start_job("restart core", request_core_restart_async):
+                    return self.send_json({"ok": False, "error": "Another installer operation is already running."}, 409)
+                return self.send_json({"ok": True, "requested": True, "message": "Home Assistant Core restart requested."}, 202)
+            if path == "/api/install-discovery":
+                def install_discovery_action():
+                    repository = ensure_discovery_repository()
+                    result = reconcile_discovery_repository_app(str(repository.get("slug") or ""))
+                    return {"ok": True, "requested": True, **result}
+                return self.send_json(run_locked("install discovery", install_discovery_action))
+            if path == "/api/restart-discovery":
+                return self.send_json(run_locked("restart discovery", lambda: {"ok": True, "requested": True, "supervisor": supervisor_request(f"/addons/{find_discovery_slug()}/restart")}))
+            if path == "/api/install-snmp2mqtt":
+                def install_snmp_action():
+                    ensure_snmp2mqtt_repository()
+                    result = install_supervisor_addon("snmp2mqtt")
+                    return {"ok": True, "requested": True, **result}
+                return self.send_json(run_locked("install snmp2mqtt", install_snmp_action))
+            if path == "/api/restart-snmp2mqtt":
+                return self.send_json(run_locked("restart snmp2mqtt", lambda: {"ok": True, "requested": True, "supervisor": supervisor_request(f"/addons/{find_snmp2mqtt_slug()}/restart")}))
+            if path == "/api/install-unifi2mqtt":
+                def install_unifi_action():
+                    ensure_unifi2mqtt_repository()
+                    result = install_supervisor_addon("unifi2mqtt")
+                    return {"ok": True, "requested": True, **result}
+                return self.send_json(run_locked("install unifi2mqtt", install_unifi_action))
+            if path == "/api/restart-unifi2mqtt":
+                return self.send_json(run_locked("restart unifi2mqtt", lambda: {"ok": True, "requested": True, "supervisor": supervisor_request(f"/addons/{find_unifi2mqtt_slug()}/restart")}))
             self.send_error(404)
-        except Exception as exc: traceback.print_exc(); self.send_json({"ok":False,"error":str(exc)},500)
-
-
+        except OperationBusyError as exc:
+            self.send_json({"ok": False, "error": str(exc)}, 409)
+        except Exception as exc:
+            traceback.print_exc()
+            self.send_json({"ok": False, "error": str(exc)}, 500)
 if __name__=="__main__":
     print(f"Switch Vision Installer {INSTALLER_VERSION} listening on 0.0.0.0:8099",flush=True); ThreadingHTTPServer(("0.0.0.0",8099),Handler).serve_forever()

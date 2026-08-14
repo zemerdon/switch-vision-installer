@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.1.19
+
+- Requires a trusted SHA-256 for every Core install/update, using GitHub's release-asset `digest` when present and cross-checking a checksum asset when both are published.
+- Requires the installable Core asset name to exactly match `switch-vision-<release-version>.zip`, verifies the downloaded byte count, and proves the packaged Core manifest version matches the GitHub release tag before replacing files.
+- Removes the incorrect Discovery-version fallback from Core installed-version detection.
+- Retries transient Home Assistant App Store publication/image races and reports a clear wait-and-retry message instead of surfacing a raw first-attempt 404/500.
+- Verifies repository-backed Discovery, SNMP2MQTT, and UniFi2MQTT actually start at the version advertised by their public repository before reporting an update as successful.
+- Reserves the Installer mutation lock before returning HTTP 202 and applies the same coordinator to backup deletion/pruning, app installs/restarts, Update Component, and Update All.
+- Makes restore transactional: a private temporary safety snapshot captures current Core/frontend/calibration/generated YAML and app options, and is automatically restored if any restore step fails.
+- Secures Installer backup directories/files to owner-only permissions because saved Supervisor options may contain credentials.
+- Adds v2.1.19 regressions covering asset/digest identity, Core-version isolation, publication retry behaviour, mutation locking, private backup permissions, and transactional restore source guards.
+
 ## v2.1.18
 
 - Removes the cancelled GitHub repository-rename migration from the component manager.

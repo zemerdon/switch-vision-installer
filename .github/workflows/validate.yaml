@@ -37,7 +37,8 @@ jobs:
             switch_vision_installer/app/web_manager.py \
             tests/test_repository_backup_model.py \
             tests/test_component_manager.py \
-            tests/test_ui_state.py
+            tests/test_ui_state.py \
+            tests/test_v2_1_19_hardening.py
 
       - name: Check shell syntax
         run: bash -n switch_vision_installer/run.sh
@@ -55,6 +56,9 @@ jobs:
 
       - name: Validate UI and state
         run: python tests/test_ui_state.py
+
+      - name: Validate v2.1.19 hardening
+        run: python tests/test_v2_1_19_hardening.py
 
       - name: Validate release metadata
         run: |
