@@ -3,6 +3,7 @@ let managedComponentSnapshot=null;
 function componentStatusLabel(row){
   if(row.remote_error)return['Unavailable','missing'];
   if(!row.installed)return[row.optional?'Optional — not installed':'Not installed','missing'];
+  if(row.status==='dependency_mismatch')return['Needs attention','missing'];
   if(row.status==='update_available')return[`Update available — v${row.latest_version}`,'missing'];
   if(row.status==='newer_local')return[`Local v${row.installed_version} is newer`,'ok'];
   return['Up to date','ok'];
@@ -53,7 +54,13 @@ function renderManagedComponents(){
     updateAll.textContent=blocked?'Update All blocked':(actionable.length?`Update All (${actionable.length})`:'Everything up to date');
   }
   const note=document.querySelector('.component-manager-note');
-  if(note&&managedComponentSnapshot?.update_all_blocked){note.innerHTML=`<b>Update All blocked:</b> ${esc(managedComponentSnapshot.update_all_blocked_reason)}`;}
+  if(note){
+    if(managedComponentSnapshot?.update_all_blocked){
+      note.innerHTML=`<b>Update All blocked:</b> ${esc(managedComponentSnapshot.update_all_blocked_reason)}`;
+    }else{
+      note.textContent='Update All uses the safe dependency order: Core → Discovery → SNMP2MQTT → UniFi2MQTT → Installer. Optional UniFi2MQTT is never installed automatically.';
+    }
+  }
 }
 
 async function loadManagedComponents(){

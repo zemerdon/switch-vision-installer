@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.1.15
+
+- Marks an installed component as **Needs attention** when its minimum Switch Vision Core dependency is not satisfied instead of incorrectly showing **Up to date**.
+- Shows both the required Core version and the currently installed Core version in the dependency warning.
+- Treats an unmet dependency as an Update All dependency condition even when the dependent component itself is already at its latest version.
+- Blocks Update All when no published Core can satisfy the requirement, and automatically clears the block when a compatible Core release is available.
+- Clears stale Update All warning text after dependencies become healthy.
+- Adds regression coverage for current-but-incompatible Discovery and compatible-Core recovery.
+
 ## v2.1.14
 
 - Adds a central Switch Vision component manager to the Installer.

@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "switch_vision_installer" / "app"
 
 fake_installer = types.ModuleType("installer")
-fake_installer.INSTALLER_VERSION = "2.1.14"
+fake_installer.INSTALLER_VERSION = "2.1.15"
 fake_installer.COMPONENT_DIR = Path("/tmp/no-component")
 fake_installer.normalise_version = lambda value: str(value or "").strip().lstrip("v")
 fake_installer.installed_version = lambda: "2.1.5"
@@ -72,10 +72,30 @@ assert module.resolve_repository(snmp) == "switch-vision-snmp2mqtt"
 
 # Discovery dependency must block a direct update on old Core.
 fake_installer.installed_version = lambda: "2.1.4"
-module._remote_version = lambda spec: {"discovery":"2.1.7","core":"2.1.5","snmp2mqtt":"0.9.7","unifi2mqtt":"2.0.38","installer":"2.1.14"}.get(spec.component_id, "")
+module._remote_version = lambda spec: {"discovery":"2.1.7","core":"2.1.5","snmp2mqtt":"0.9.7","unifi2mqtt":"2.0.38","installer":"2.1.15"}.get(spec.component_id, "")
 module.clear_cache()
 row = module._component_status(discovery)
 assert row["dependency_ok"] is False
+assert row["status"] == "dependency_mismatch"
 assert "v2.1.5+" in row["dependency_note"]
+assert "Installed Core: v2.1.4" in row["dependency_note"]
+
+# A current Discovery with an unmet dependency still needs attention. If the
+# published Core cannot satisfy that dependency, Update All must be blocked.
+module._remote_version = lambda spec: {"discovery":"2.1.7","core":"2.1.4","snmp2mqtt":"0.9.7","unifi2mqtt":"2.0.38","installer":"2.1.15"}.get(spec.component_id, "")
+module.clear_cache()
+snapshot = module.component_status()
+discovery_row = next(item for item in snapshot["components"] if item["id"] == "discovery")
+assert discovery_row["status"] == "dependency_mismatch"
+assert snapshot["update_all_blocked"] is True
+assert "Publish/update Core first" in snapshot["update_all_blocked_reason"]
+
+# Once a compatible Core is published, Update All is allowed and upgrades Core
+# first; Discovery remains marked Needs attention only until that Core update runs.
+module._remote_version = lambda spec: {"discovery":"2.1.7","core":"2.1.5","snmp2mqtt":"0.9.7","unifi2mqtt":"2.0.38","installer":"2.1.15"}.get(spec.component_id, "")
+module.clear_cache()
+snapshot = module.component_status()
+assert snapshot["update_all_blocked"] is False
+assert snapshot["updates_available"] >= 1
 
 print("repository rename/dependency regressions: PASS")

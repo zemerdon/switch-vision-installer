@@ -14,6 +14,10 @@ Each component exposes its installed version, latest repository version, current
 
 `Update All` uses dependency order: Core → Discovery → SNMP2MQTT → UniFi2MQTT → Installer. Optional UniFi2MQTT is never installed implicitly.
 
+## Dependency health
+
+A component can be at its latest published version and still require attention when a minimum dependency is not satisfied. The manager reports that state separately from **Up to date** and Update All resolves compatible Core updates before dependent components.
+
 ## Repository rename migration
 
 Target public component names:

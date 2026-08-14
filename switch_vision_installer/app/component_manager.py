@@ -247,12 +247,18 @@ def _component_status(spec: ComponentSpec) -> dict[str, Any]:
         core_version = installer_core.normalise_version(installer_core.installed_version())
         dependency_ok = bool(core_version and compare_versions(core_version, spec.min_core) >= 0)
         if not dependency_ok:
-            dependency_note = f"Requires Switch Vision Core v{spec.min_core}+"
+            installed_core = f"v{core_version}" if core_version else "not installed"
+            dependency_note = (
+                f"Requires Switch Vision Core v{spec.min_core}+ · "
+                f"Installed Core: {installed_core}"
+            )
 
     if remote_error:
         status = "unavailable"
     elif not installed:
         status = "optional" if spec.optional else "not_installed"
+    elif not dependency_ok:
+        status = "dependency_mismatch"
     elif update_available:
         status = "update_available"
     elif newer_local:
@@ -294,7 +300,9 @@ def component_status() -> dict[str, Any]:
     discovery = by_id.get("discovery", {})
     core = by_id.get("core", {})
     discovery_needs_action = bool(
-        discovery.get("update_available") or not discovery.get("installed", True)
+        discovery.get("update_available")
+        or not discovery.get("installed", True)
+        or not discovery.get("dependency_ok", True)
     )
     if discovery_needs_action and not discovery.get("dependency_ok", True):
         requirement = _spec("discovery").min_core or ""
