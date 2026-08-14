@@ -1,5 +1,16 @@
 # Changelog
 
+## v2.1.18
+
+- Removes the cancelled GitHub repository-rename migration from the component manager.
+- Treats the existing public repository names as permanent: Core uses `switch-vision-releases`, while the SNMP2MQTT Home Assistant app uses `switch-vision-snmp2mqtt-addon`.
+- Keeps the SNMP2MQTT engine source repository `switch-vision-snmp2mqtt` separate from the Home Assistant app repository.
+- Removes the misleading **legacy repo alias active** labels and the obsolete `legacy_repository` component-status field.
+- Keeps repository-backed install/update behaviour unchanged and continues validating the expected Home Assistant app layout.
+- Updates Component Manager documentation to the permanent repository identities.
+- Renames the v2.1.17-specific UI regression test to a version-independent test so it remains valid for future Installer releases.
+- Changes GitHub Actions release validation from hard-coded version greps to config/backend/changelog consistency checks.
+
 ## v2.1.17
 
 - Fixes stale System Actions controls so Discovery, SNMP2MQTT, and UniFi2MQTT install/restart buttons always follow the current Home Assistant Supervisor state.

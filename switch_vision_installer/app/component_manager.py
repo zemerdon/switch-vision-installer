@@ -26,15 +26,14 @@ class ComponentSpec:
     min_core: str | None = None
 
 
-# Canonical component repositories come first. Legacy names remain accepted so
-# existing Home Assistant repository registrations continue working through the
-# repository-rename migration.
+# These are the permanent public repository identities used by Switch Vision.
+# No GitHub repository rename is pending.
 COMPONENTS: tuple[ComponentSpec, ...] = (
     ComponentSpec(
         "core",
         "Switch Vision Core",
         "core",
-        ("switch-vision-core", "switch-vision-releases"),
+        ("switch-vision-releases",),
     ),
     ComponentSpec(
         "discovery",
@@ -49,7 +48,7 @@ COMPONENTS: tuple[ComponentSpec, ...] = (
         "snmp2mqtt",
         "Switch Vision SNMP2MQTT",
         "addon",
-        ("switch-vision-snmp2mqtt", "switch-vision-snmp2mqtt-addon"),
+        ("switch-vision-snmp2mqtt-addon",),
         "switch-vision-snmp2mqtt/config.yaml",
         "switch-vision-snmp2mqtt/CHANGELOG.md",
     ),
@@ -125,12 +124,10 @@ def _spec(component_id: str) -> ComponentSpec:
 
 
 def resolve_repository(spec: ComponentSpec) -> str:
-    """Resolve the currently valid repository, preferring the canonical name.
+    """Resolve the configured public repository for a component.
 
-    Config-path probing is intentional: before the SNMP2MQTT rename, the future
-    canonical repo name belongs to the engine source repository rather than the
-    Home Assistant app repository. Requiring the expected HA config path avoids
-    registering the wrong repository during the migration window.
+    Add-on repositories are validated by their expected Home Assistant app config
+    path so an unrelated source repository cannot be selected accidentally.
     """
     def loader() -> str:
         for repository in spec.repositories:
@@ -281,7 +278,6 @@ def _component_status(spec: ComponentSpec) -> dict[str, Any]:
         "slug": slug,
         "canonical_repository": f"https://github.com/zemerdon/{spec.repositories[0]}",
         "active_repository": repository_url(spec),
-        "legacy_repository": resolve_repository(spec) != spec.repositories[0],
         "dependency_ok": dependency_ok,
         "dependency_note": dependency_note,
         "remote_error": remote_error,
@@ -370,7 +366,7 @@ def component_changelog(component_id: str) -> dict[str, Any]:
 
 
 def _registered_repository_url(spec: ComponentSpec) -> str | None:
-    """Prefer an already-registered legacy/canonical URL to avoid duplicates."""
+    """Prefer an already-registered matching repository URL to avoid duplicates."""
     try:
         entries = repository_setup._repository_list()
         normalise = repository_setup._normalise_repo_url
@@ -391,7 +387,7 @@ def _registered_repository_url(spec: ComponentSpec) -> str | None:
 
 
 def _set_repository_compatibility() -> None:
-    """Point legacy installer helpers at a registered alias or valid repository."""
+    """Point installer repository helpers at registered or configured URLs."""
     for component_id, attribute in (
         ("snmp2mqtt", "SNMP2MQTT_REPOSITORY"),
         ("discovery", "DISCOVERY_REPOSITORY"),

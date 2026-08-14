@@ -31,10 +31,9 @@ function renderManagedComponents(){
     const [status,cls]=componentStatusLabel(row);
     const action=managedComponentAction(row);
     const dependency=row.dependency_note&&!row.dependency_ok?`<div class="component-dependency">${esc(row.dependency_note)}</div>`:'';
-    const repoNote=row.legacy_repository?'<span class="component-repo-note">legacy repo alias active</span>':'';
     return `<div class="managed-component" data-component="${esc(row.id)}">
       <div class="managed-component-main">
-        <div class="managed-component-title">${esc(row.label)} ${repoNote}</div>
+        <div class="managed-component-title">${esc(row.label)}</div>
         <div class="managed-component-version">${esc(componentVersionText(row))}</div>
         ${dependency}
       </div>

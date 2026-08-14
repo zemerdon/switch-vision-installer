@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 ROOT = Path(__file__).resolve().parents[1]
 WWW = ROOT / "switch_vision_installer" / "www"
@@ -10,13 +11,15 @@ manager_js = (WWW / "component-manager.js").read_text(encoding="utf-8")
 config = (ROOT / "switch_vision_installer" / "config.yaml").read_text(encoding="utf-8")
 backend = (APP / "installer.py").read_text(encoding="utf-8")
 
-assert 'version: "2.1.17"' in config
-assert 'INSTALLER_VERSION = "2.1.17"' in backend
+config_version = re.search(r'(?m)^version:\s*["\']?([^"\'\s#]+)', config).group(1)
+backend_version = re.search(r'(?m)^INSTALLER_VERSION\s*=\s*"([^"]+)"', backend).group(1)
+assert config_version == backend_version
 
 assert 'id="show-changelog"' not in index
 assert 'changelog-history.js' not in index
 assert not (WWW / "changelog-history.js").exists()
 assert "legacyChangelog=$('show-changelog')" not in manager_js
+assert "legacy repo alias active" not in manager_js
 
 assert 'id="install-unifi2mqtt" class="secondary hidden"' in index
 assert "function syncSystemActions" in installer_js
@@ -29,4 +32,4 @@ assert "Restart Home Assistant Core required" in installer_js
 assert 'id="result-restart-core"' in installer_js
 assert "resultSummaryWithCoreRestart(op.result)" in installer_js
 
-print("Installer v2.1.17 UI/state regressions: PASS")
+print(f"Installer UI/state regressions: PASS (v{config_version})")

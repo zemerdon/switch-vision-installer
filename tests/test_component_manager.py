@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "switch_vision_installer" / "app"
 
 fake_installer = types.ModuleType("installer")
-fake_installer.INSTALLER_VERSION = "2.1.16"
+fake_installer.INSTALLER_VERSION = "2.1.18"
 fake_installer.COMPONENT_DIR = Path("/tmp/no-component")
 fake_installer.normalise_version = lambda value: str(value or "").strip().lstrip("v")
 fake_installer.installed_version = lambda: "2.1.5"
@@ -37,9 +37,11 @@ assert module.compare_versions("2.1.14", "2.1.13") > 0
 assert module.compare_versions("2.1.7", "2.1.7") == 0
 assert module.compare_versions("0.9.7", "0.10.0") < 0
 
+core = module._spec("core")
+assert core.repositories == ("switch-vision-releases",)
+
 snmp = module._spec("snmp2mqtt")
-assert snmp.repositories[0] == "switch-vision-snmp2mqtt"
-assert "switch-vision-snmp2mqtt-addon" in snmp.repositories
+assert snmp.repositories == ("switch-vision-snmp2mqtt-addon",)
 assert snmp.config_path == "switch-vision-snmp2mqtt/config.yaml"
 
 discovery = module._spec("discovery")
@@ -49,30 +51,22 @@ order = [spec.component_id for spec in module.COMPONENTS]
 assert order == ["core", "discovery", "snmp2mqtt", "unifi2mqtt", "installer"]
 print("component manager regression tests: PASS")
 
-# The future canonical SNMP2MQTT name currently belongs to the engine repo.
-# Resolver must reject it unless the expected Home Assistant app config exists.
+# The SNMP2MQTT Home Assistant app repository is permanent. The engine source
+# repository must never be probed as an app repository candidate.
 module.clear_cache()
-def raw_before_rename(repo, path):
-    if repo == "switch-vision-snmp2mqtt":
-        raise FileNotFoundError("engine repo has no HA app config")
+raw_calls = []
+def raw_app_repository(repo, path):
+    raw_calls.append((repo, path))
     if repo == "switch-vision-snmp2mqtt-addon":
         return 'name: Switch Vision SNMP2MQTT\nversion: "0.9.7"\n'
     raise FileNotFoundError(repo)
-module._raw_text = raw_before_rename
+module._raw_text = raw_app_repository
 assert module.resolve_repository(snmp) == "switch-vision-snmp2mqtt-addon"
-
-# After the rename, the canonical repo contains the HA app layout and wins.
-module.clear_cache()
-def raw_after_rename(repo, path):
-    if repo == "switch-vision-snmp2mqtt":
-        return 'name: Switch Vision SNMP2MQTT\nversion: "0.9.7"\n'
-    raise FileNotFoundError(repo)
-module._raw_text = raw_after_rename
-assert module.resolve_repository(snmp) == "switch-vision-snmp2mqtt"
+assert all(repo != "switch-vision-snmp2mqtt" for repo, _ in raw_calls)
 
 # Discovery dependency must block a direct update on old Core.
 fake_installer.installed_version = lambda: "2.1.4"
-module._remote_version = lambda spec: {"discovery":"2.1.7","core":"2.1.5","snmp2mqtt":"0.9.7","unifi2mqtt":"2.0.38","installer":"2.1.16"}.get(spec.component_id, "")
+module._remote_version = lambda spec: {"discovery":"2.1.7","core":"2.1.5","snmp2mqtt":"0.9.7","unifi2mqtt":"2.0.38","installer":"2.1.18"}.get(spec.component_id, "")
 module.clear_cache()
 row = module._component_status(discovery)
 assert row["dependency_ok"] is False
@@ -82,7 +76,7 @@ assert "Installed Core: v2.1.4" in row["dependency_note"]
 
 # A current Discovery with an unmet dependency still needs attention. If the
 # published Core cannot satisfy that dependency, Update All must be blocked.
-module._remote_version = lambda spec: {"discovery":"2.1.7","core":"2.1.4","snmp2mqtt":"0.9.7","unifi2mqtt":"2.0.38","installer":"2.1.16"}.get(spec.component_id, "")
+module._remote_version = lambda spec: {"discovery":"2.1.7","core":"2.1.4","snmp2mqtt":"0.9.7","unifi2mqtt":"2.0.38","installer":"2.1.18"}.get(spec.component_id, "")
 module.clear_cache()
 snapshot = module.component_status()
 discovery_row = next(item for item in snapshot["components"] if item["id"] == "discovery")
@@ -92,26 +86,28 @@ assert "Publish/update Core first" in snapshot["update_all_blocked_reason"]
 
 # Once a compatible Core is published, Update All is allowed and upgrades Core
 # first; Discovery remains marked Needs attention only until that Core update runs.
-module._remote_version = lambda spec: {"discovery":"2.1.7","core":"2.1.5","snmp2mqtt":"0.9.7","unifi2mqtt":"2.0.38","installer":"2.1.16"}.get(spec.component_id, "")
+module._remote_version = lambda spec: {"discovery":"2.1.7","core":"2.1.5","snmp2mqtt":"0.9.7","unifi2mqtt":"2.0.38","installer":"2.1.18"}.get(spec.component_id, "")
 module.clear_cache()
 snapshot = module.component_status()
 assert snapshot["update_all_blocked"] is False
 assert snapshot["updates_available"] >= 1
 
-print("repository rename/dependency regressions: PASS")
+print("repository identity/dependency regressions: PASS")
 
 # Installer self-update safety.
-fake_installer.INSTALLER_VERSION = "2.1.16"
+fake_installer.INSTALLER_VERSION = "2.1.18"
 fake_installer.installed_version = lambda: "2.1.5"
 module._remote_version = lambda spec: {
     "discovery": "2.1.7",
     "core": "2.1.5",
     "snmp2mqtt": "0.9.7",
     "unifi2mqtt": "2.0.38",
-    "installer": "2.1.17",
+    "installer": "2.1.19",
 }.get(spec.component_id, "")
 module.clear_cache()
 snapshot = module.component_status()
+for component_row in snapshot["components"]:
+    assert "legacy_repository" not in component_row
 installer_row = next(item for item in snapshot["components"] if item["id"] == "installer")
 assert installer_row["update_available"] is True
 assert installer_row["external_update"] is True

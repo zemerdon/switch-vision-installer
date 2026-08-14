@@ -18,17 +18,17 @@ Each component exposes its installed version, latest repository version, current
 
 A component can be at its latest published version and still require attention when a minimum dependency is not satisfied. The manager reports that state separately from **Up to date** and Update All resolves compatible Core updates before dependent components.
 
-## Repository rename migration
+## Repository identities
 
-Target public component names:
+The existing public GitHub repository names are the permanent identities. No repository rename is planned:
 
-- `switch-vision-releases` → `switch-vision-core`
-- `switch-vision-snmp2mqtt` (engine source) → `switch-vision-snmp2mqtt-engine`
-- `switch-vision-snmp2mqtt-addon` → `switch-vision-snmp2mqtt`
-- `switch-vision-discovery` unchanged
-- `switch-vision-unifi2mqtt` unchanged
-- `switch-vision-installer` unchanged
+- Core releases: `switch-vision-releases`
+- Discovery: `switch-vision-discovery`
+- SNMP2MQTT engine source: `switch-vision-snmp2mqtt`
+- SNMP2MQTT Home Assistant app: `switch-vision-snmp2mqtt-addon`
+- UniFi2MQTT: `switch-vision-unifi2mqtt`
+- Installer: `switch-vision-installer`
 
-The component manager accepts legacy aliases during migration. SNMP2MQTT repository detection validates the Home Assistant app layout before accepting the canonical name, avoiding the temporary name collision with the engine repository.
+The component manager addresses the Home Assistant app repositories directly and validates the expected app layout before using them. The SNMP2MQTT engine source repository is intentionally separate from the Home Assistant app repository.
 
 Normal users continue to add only `https://github.com/zemerdon/switch-vision-installer`.

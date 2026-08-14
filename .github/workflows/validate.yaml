@@ -37,7 +37,7 @@ jobs:
             switch_vision_installer/app/web_manager.py \
             tests/test_repository_backup_model.py \
             tests/test_component_manager.py \
-            tests/test_v2_1_17_ui_state.py
+            tests/test_ui_state.py
 
       - name: Check shell syntax
         run: bash -n switch_vision_installer/run.sh
@@ -53,11 +53,34 @@ jobs:
       - name: Validate component manager
         run: python tests/test_component_manager.py
 
-      - name: Validate v2.1.17 UI and state
-        run: python tests/test_v2_1_17_ui_state.py
+      - name: Validate UI and state
+        run: python tests/test_ui_state.py
 
       - name: Validate release metadata
         run: |
-          grep -F 'version: "2.1.17"' switch_vision_installer/config.yaml
-          grep -F 'INSTALLER_VERSION = "2.1.17"' switch_vision_installer/app/installer.py
-          grep -F '## v2.1.17' switch_vision_installer/CHANGELOG.md
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          config = Path("switch_vision_installer/config.yaml").read_text(encoding="utf-8")
+          backend = Path("switch_vision_installer/app/installer.py").read_text(encoding="utf-8")
+          changelog = Path("switch_vision_installer/CHANGELOG.md").read_text(encoding="utf-8")
+
+          config_match = re.search(r"(?m)^version:\s*[\"']?([^\"'\s#]+)", config)
+          backend_match = re.search(r'(?m)^INSTALLER_VERSION\s*=\s*"([^"]+)"', backend)
+
+          assert config_match, "config.yaml version missing"
+          assert backend_match, "INSTALLER_VERSION missing"
+
+          config_version = config_match.group(1)
+          backend_version = backend_match.group(1)
+
+          assert config_version == backend_version, (
+              f"Installer version mismatch: config={config_version}, backend={backend_version}"
+          )
+          assert f"## v{config_version}" in changelog, (
+              f"CHANGELOG.md has no v{config_version} entry"
+          )
+
+          print(f"release metadata consistency: PASS (v{config_version})")
+          PY
