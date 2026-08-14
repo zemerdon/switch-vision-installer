@@ -1,8 +1,16 @@
-# Switch Vision Installer v2.1.16
+# Switch Vision Installer v2.1.19
 
 Official Home Assistant App for installing and updating Switch Vision from the public Switch Vision release repository.
 
 The Installer is the only repository end users need to add manually. It installs the Switch Vision integration/frontend and manages the official Discovery, SNMP2MQTT, and optional UniFi2MQTT app repositories through Home Assistant Supervisor.
+
+
+## v2.1.19
+
+- Verifies the exact versioned Core asset and a trusted SHA-256 before installation.
+- Retries temporary Home Assistant App Store image-publication races.
+- Serializes all Installer mutations and makes backup restore transactional.
+- Keeps credential-bearing backups owner-only.
 
 ## v2.1.16
 

@@ -403,6 +403,9 @@ def _set_repository_compatibility() -> None:
 
 def _addon_update(component_id: str, progress: Progress | None = None) -> dict[str, Any]:
     _set_repository_compatibility()
+    spec = _spec(component_id)
+    expected_version = installer_core.normalise_version(_remote_version(spec))
+
     if component_id == "discovery":
         if progress:
             progress("Checking the Discovery repository…", 15)
@@ -410,11 +413,21 @@ def _addon_update(component_id: str, progress: Progress | None = None) -> dict[s
         result = installer_core.reconcile_discovery_repository_app(
             str(repo.get("slug") or ""), progress
         )
+        actual = installer_core.normalise_version(result.get("version"))
+        if expected_version and actual != expected_version:
+            raise RuntimeError(
+                f"Discovery repository advertises v{expected_version}, but Supervisor "
+                f"started v{actual or 'unknown'}. The new app image may still be publishing; "
+                "wait about one minute and retry."
+            )
         return {
             "ok": True,
-            "version": result.get("version"),
+            "version": actual,
             "installed": ["Switch Vision Discovery"],
-            "unchanged": [] if result.get("updated") or result.get("installed_now") else ["Switch Vision Discovery"],
+            "unchanged": (
+                [] if result.get("updated") or result.get("installed_now")
+                else ["Switch Vision Discovery"]
+            ),
             "required_actions": [],
             "component_update": component_id,
         }
@@ -447,41 +460,53 @@ def _addon_update(component_id: str, progress: Progress | None = None) -> dict[s
 
     if not installed:
         if progress:
-            progress(f"Installing {component_id}…", 45)
+            progress(f"Installing {component_id} v{expected_version or 'latest'}…", 45)
         installer_core.install_supervisor_addon(install_kind)
-        info = installer_core.wait_for_addon(slug, timeout=300)
-    else:
-        latest = installer_core.normalise_version(info.get("version_latest"))
-        current = installer_core.normalise_version(info.get("version"))
-        should_update = bool(info.get("update_available")) or (
-            latest and current and compare_versions(current, latest) < 0
+        info = installer_core.wait_for_addon(
+            slug, expected_version=expected_version or None, timeout=300
         )
+    else:
+        current = installer_core.normalise_version(info.get("version"))
+        should_update = bool(
+            expected_version and current and compare_versions(current, expected_version) < 0
+        ) or bool(info.get("update_available"))
         if should_update:
             was_started = str(info.get("state") or "").lower() == "started"
             if progress:
-                progress(f"Updating {component_id} to v{latest or 'latest'}…", 55)
-            installer_core.supervisor_request(
+                progress(f"Updating {component_id} to v{expected_version or 'latest'}…", 55)
+            installer_core.supervisor_store_request(
                 f"/store/addons/{slug}/update",
-                method="POST",
                 payload={"backup": False, "background": False},
+                progress=progress,
             )
             info = installer_core.wait_for_addon(
-                slug, expected_version=latest or None, timeout=300
+                slug, expected_version=expected_version or None, timeout=300
             )
             if was_started and str(info.get("state") or "").lower() != "started":
-                installer_core.supervisor_request(f"/addons/{slug}/start", method="POST")
-                info = installer_core.wait_for_addon(slug, expected_state="started", timeout=180)
+                installer_core.supervisor_request(
+                    f"/addons/{slug}/start", method="POST"
+                )
+                info = installer_core.wait_for_addon(
+                    slug, expected_state="started", timeout=180
+                )
+
+    actual_version = installer_core.normalise_version(info.get("version"))
+    if expected_version and actual_version != expected_version:
+        raise RuntimeError(
+            f"{spec.label} repository advertises v{expected_version}, but Supervisor "
+            f"has v{actual_version or 'unknown'}. The new app image may still be "
+            "publishing; wait about one minute and retry."
+        )
 
     clear_cache()
     return {
         "ok": True,
-        "version": installer_core.normalise_version(info.get("version")),
-        "installed": [f"{_spec(component_id).label}"],
+        "version": actual_version,
+        "installed": [spec.label],
         "unchanged": [],
         "required_actions": [],
         "component_update": component_id,
     }
-
 
 def _installer_slug() -> str:
     addon = installer_core._find_addon(

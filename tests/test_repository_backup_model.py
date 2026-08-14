@@ -18,7 +18,7 @@ mod = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = mod
 spec.loader.exec_module(mod)
 
-assert mod.INSTALLER_VERSION == "2.1.18"
+assert mod.INSTALLER_VERSION == "2.1.19"
 
 with tempfile.TemporaryDirectory() as td:
     digest_base = Path(td)
@@ -71,7 +71,7 @@ assert "check Home Assistant " in web_py_source
 assert "Supervisor logs for details." in web_py_source
 assert "Original error: " in web_py_source
 create_section = source[source.index("def create_backup("):source.index("def create_manual_backup(")]
-restore_section = source[source.index("def restore_backup("):source.index("def collect_custom_assets(")]
+restore_section = source[source.index("def _restore_backup_contents("):source.index("def collect_custom_assets(")]
 
 assert 'copy_backup(DISCOVERY_DIR' not in create_section
 assert 'copy_backup(SNMP2MQTT_DIR' not in create_section
@@ -121,6 +121,7 @@ assert mod.unifi2mqtt_options_configured(None) is False
 with tempfile.TemporaryDirectory() as td:
     base = Path(td)
     mod.BACKUP_DIR = base / "backups"
+    mod.WORK_DIR = base / "work"
     mod.LEGACY_BACKUP_DIR = base / "legacy-backups"
     mod.HA_CONFIG = base / "homeassistant"
     mod.COMPONENT_DIR = mod.HA_CONFIG / "custom_components" / "switch_vision"
