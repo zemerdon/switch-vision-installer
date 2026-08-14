@@ -1,5 +1,16 @@
 # Changelog
 
+## v2.1.17
+
+- Fixes stale System Actions controls so Discovery, SNMP2MQTT, and UniFi2MQTT install/restart buttons always follow the current Home Assistant Supervisor state.
+- Fixes **Install UniFi2MQTT add-on** remaining visible when UniFi2MQTT is already installed.
+- Keeps optional app install controls hidden until Supervisor status has been loaded, avoiding misleading startup-state actions.
+- Adds a prominent **Restart Home Assistant Core required** action immediately after a Core install/update/reinstall changes the custom integration.
+- Explains that new Core files can be on disk while Home Assistant is still running the previous integration version in memory until Core is restarted.
+- Removes the redundant top **Core changelog** button; component changelogs remain beside each component in the Components section.
+- Removes the obsolete changelog previous/next arrows and their separate history script; the full changelog remains available in the existing scrollable window.
+- Adds regression checks for the v2.1.17 Installer UI/state cleanup.
+
 ## v2.1.16
 
 - Prevents the running Installer from attempting to update its own Home Assistant app through Supervisor.

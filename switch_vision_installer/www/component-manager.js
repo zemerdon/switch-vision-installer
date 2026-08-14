@@ -115,13 +115,4 @@ $('update-all-components')?.addEventListener('click',async()=>{
   catch(error){showResult(`Update All failed: ${esc(error.message)}`,'error');}
 });
 
-// The per-component changelog buttons supersede the old latest-Core-only control.
-const legacyChangelog=$('show-changelog');
-if(legacyChangelog){
-  const clean=legacyChangelog.cloneNode(true);
-  legacyChangelog.replaceWith(clean);
-  clean.textContent='Core changelog';clean.disabled=false;
-  clean.addEventListener('click',()=>openComponentChangelog('core'));
-}
-
 loadManagedComponents();
