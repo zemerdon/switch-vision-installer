@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.1.20
+
+- Replaces Core and dashboard frontend trees through same-directory staging and atomic rename promotion instead of deleting the live destination before copying the replacement.
+- Writes a durable owner-only replacement transaction marker before moving the live tree, preserving enough state to recover from container, process, host, or power failure between rename operations.
+- Recovers interrupted Core/frontend replacement transactions automatically when the Installer starts.
+- Restores the previous tree for ordinary Python exceptions while preserving crash-recovery state if automatic rollback itself cannot complete.
+- Validates transaction-marker paths before recovery and refuses symbolic-link or out-of-directory recovery targets.
+- Adds regressions for successful replacement, staging-copy failure, crash after old-tree move, crash after new-tree promotion, first-install recovery, unsafe marker rejection, and startup recovery across both Installer-managed trees.
+- Preserves the v2.1.19 checksum, backup-integrity, transactional restore, mutation-lock, and repository-backed component behavior unchanged.
+
 ## v2.1.19
 
 - Requires a trusted SHA-256 for every Core install/update, using GitHub's release-asset `digest` when present and cross-checking a checksum asset when both are published.

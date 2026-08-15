@@ -38,7 +38,8 @@ jobs:
             tests/test_repository_backup_model.py \
             tests/test_component_manager.py \
             tests/test_ui_state.py \
-            tests/test_v2_1_19_hardening.py
+            tests/test_v2_1_19_hardening.py \
+            tests/test_v2_1_20_atomic_replace.py
 
       - name: Check shell syntax
         run: bash -n switch_vision_installer/run.sh
@@ -57,8 +58,11 @@ jobs:
       - name: Validate UI and state
         run: python tests/test_ui_state.py
 
-      - name: Validate v2.1.19 hardening
+      - name: Validate v2.1.20 hardening
         run: python tests/test_v2_1_19_hardening.py
+
+      - name: Validate crash-atomic replacement
+        run: python tests/test_v2_1_20_atomic_replace.py
 
       - name: Validate release metadata
         run: |

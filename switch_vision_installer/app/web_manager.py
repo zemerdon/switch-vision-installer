@@ -57,5 +57,12 @@ class Handler(legacy_web.Handler):
             return self.send_json({"ok": False, "error": str(exc)}, 500)
         return super().do_POST()
 if __name__ == "__main__":
+    recovered = legacy_web.installer_core.recover_interrupted_tree_replacements()
+    if recovered:
+        print(
+            "Recovered interrupted Switch Vision filesystem replacement(s): "
+            + ", ".join(recovered),
+            flush=True,
+        )
     print(f"Switch Vision Installer v{legacy_web.INSTALLER_VERSION} component manager listening on 0.0.0.0:8099", flush=True)
     ThreadingHTTPServer(("0.0.0.0", 8099), Handler).serve_forever()
