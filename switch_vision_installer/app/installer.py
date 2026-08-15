@@ -17,7 +17,7 @@ import urllib.error
 import zipfile
 import re
 
-INSTALLER_VERSION = "2.1.19"
+INSTALLER_VERSION = "2.1.20"
 OPTIONS_PATH = Path(os.environ.get("SV_INSTALLER_OPTIONS", "/data/options.json"))
 STATE_PATH = Path(os.environ.get("SV_INSTALLER_STATE", "/data/state.json"))
 WORK_DIR = Path(os.environ.get("SV_INSTALLER_WORK", "/data/work"))
@@ -1242,9 +1242,263 @@ def delete_backup(name: str) -> dict[str, Any]:
     return {"ok": True, "deleted": name}
 
 
+REPLACE_TRANSACTION_SUFFIX = ".switch-vision-replace.json"
+
+
+def _remove_tree_path(path: Path) -> None:
+    if path.is_symlink() or path.is_file():
+        path.unlink()
+    elif path.exists():
+        shutil.rmtree(path)
+
+
+def _fsync_directory(path: Path) -> None:
+    flags = os.O_RDONLY
+    if hasattr(os, "O_DIRECTORY"):
+        flags |= os.O_DIRECTORY
+    try:
+        fd = os.open(path, flags)
+    except OSError:
+        return
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+def _replacement_marker_path(destination: Path) -> Path:
+    return destination.parent / (
+        f".{destination.name}{REPLACE_TRANSACTION_SUFFIX}"
+    )
+
+
+def _validated_transaction_path(
+    destination: Path,
+    value: Any,
+    kind: str,
+) -> Path:
+    parent = destination.parent.resolve()
+    candidate = Path(str(value or ""))
+    if not candidate.is_absolute():
+        candidate = destination.parent / candidate
+    try:
+        candidate_parent = candidate.parent.resolve()
+    except OSError as exc:
+        raise RuntimeError(
+            f"Interrupted replacement {kind} path is invalid: {candidate}"
+        ) from exc
+    expected_prefix = f".{destination.name}.switch-vision-{kind}-"
+    if (
+        candidate_parent != parent
+        or not candidate.name.startswith(expected_prefix)
+    ):
+        raise RuntimeError(
+            f"Interrupted replacement {kind} path is outside the expected "
+            f"destination directory: {candidate}"
+        )
+    return candidate
+
+
+def _write_replace_transaction(
+    destination: Path,
+    stage: Path,
+    previous: Path,
+    had_destination: bool,
+) -> Path:
+    marker = _replacement_marker_path(destination)
+    payload = {
+        "schema": 1,
+        "destination": str(destination),
+        "stage": str(stage),
+        "previous": str(previous),
+        "had_destination": bool(had_destination),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    temp = marker.parent / f".{marker.name}.{os.getpid()}.tmp"
+    try:
+        with temp.open("w", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        temp.chmod(0o600)
+        os.replace(temp, marker)
+        _fsync_directory(marker.parent)
+    finally:
+        if temp.exists():
+            temp.unlink()
+    return marker
+
+
+def _load_replace_transaction(destination: Path) -> tuple[Path, Path, Path, bool] | None:
+    marker = _replacement_marker_path(destination)
+    if not marker.exists():
+        return None
+    if marker.is_symlink() or not marker.is_file():
+        raise RuntimeError(
+            f"Interrupted replacement marker is not a regular file: {marker}"
+        )
+    try:
+        payload = json.loads(marker.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(
+            f"Interrupted replacement marker is unreadable: {marker}"
+        ) from exc
+    if not isinstance(payload, dict) or payload.get("schema") != 1:
+        raise RuntimeError(
+            f"Interrupted replacement marker has an unsupported schema: {marker}"
+        )
+    recorded_destination = Path(str(payload.get("destination") or ""))
+    if recorded_destination != destination:
+        raise RuntimeError(
+            "Interrupted replacement marker destination does not match "
+            f"{destination}: {recorded_destination}"
+        )
+    stage = _validated_transaction_path(
+        destination, payload.get("stage"), "stage"
+    )
+    previous = _validated_transaction_path(
+        destination, payload.get("previous"), "previous"
+    )
+    return marker, stage, previous, bool(payload.get("had_destination"))
+
+
+def recover_interrupted_tree_replacement(destination: Path) -> bool:
+    transaction = _load_replace_transaction(destination)
+    if transaction is None:
+        return False
+    marker, stage, previous, had_destination = transaction
+
+    if destination.is_symlink():
+        raise RuntimeError(
+            f"Refusing to recover replacement over symbolic link: {destination}"
+        )
+    if stage.is_symlink() or previous.is_symlink():
+        raise RuntimeError(
+            "Interrupted replacement contains an unexpected symbolic link."
+        )
+
+    if destination.exists():
+        _remove_tree_path(previous)
+        _remove_tree_path(stage)
+    elif previous.exists():
+        os.replace(previous, destination)
+        _fsync_directory(destination.parent)
+        _remove_tree_path(stage)
+    elif stage.exists() and not had_destination:
+        os.replace(stage, destination)
+        _fsync_directory(destination.parent)
+    elif stage.exists():
+        raise RuntimeError(
+            f"Interrupted replacement for {destination} lost its previous tree."
+        )
+    elif had_destination:
+        raise RuntimeError(
+            f"Interrupted replacement for {destination} cannot recover the "
+            "previous installation."
+        )
+
+    marker.unlink(missing_ok=True)
+    _fsync_directory(destination.parent)
+    return True
+
+
+def recover_interrupted_tree_replacements() -> list[str]:
+    recovered: list[str] = []
+    for destination in (COMPONENT_DIR, FRONTEND_DIR):
+        if recover_interrupted_tree_replacement(destination):
+            recovered.append(str(destination))
+    return recovered
+
+
+def _rollback_tree_replacement(
+    destination: Path,
+    stage: Path,
+    previous: Path,
+    had_destination: bool,
+) -> None:
+    if previous.exists():
+        if destination.exists():
+            if stage.exists():
+                _remove_tree_path(stage)
+            os.replace(destination, stage)
+            _fsync_directory(destination.parent)
+        os.replace(previous, destination)
+        _fsync_directory(destination.parent)
+        _remove_tree_path(stage)
+    elif not had_destination and destination.exists():
+        if stage.exists():
+            _remove_tree_path(stage)
+        os.replace(destination, stage)
+        _fsync_directory(destination.parent)
+        _remove_tree_path(stage)
+    else:
+        _remove_tree_path(stage)
+
+    marker = _replacement_marker_path(destination)
+    marker.unlink(missing_ok=True)
+    _fsync_directory(destination.parent)
+
+
 def replace_tree(source: Path, destination: Path) -> None:
-    if destination.exists(): shutil.rmtree(destination)
-    destination.parent.mkdir(parents=True, exist_ok=True); shutil.copytree(source, destination)
+    if not source.is_dir():
+        raise RuntimeError(f"Replacement source is not a directory: {source}")
+    if destination.is_symlink():
+        raise RuntimeError(
+            f"Refusing to replace symbolic-link destination: {destination}"
+        )
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    recover_interrupted_tree_replacement(destination)
+
+    token = f"{os.getpid()}-{time.monotonic_ns()}"
+    stage = destination.parent / (
+        f".{destination.name}.switch-vision-stage-{token}"
+    )
+    previous = destination.parent / (
+        f".{destination.name}.switch-vision-previous-{token}"
+    )
+    had_destination = destination.exists()
+
+    try:
+        shutil.copytree(source, stage)
+    except Exception:
+        _remove_tree_path(stage)
+        raise
+
+    marker = _write_replace_transaction(
+        destination,
+        stage,
+        previous,
+        had_destination,
+    )
+
+    try:
+        if had_destination:
+            os.replace(destination, previous)
+            _fsync_directory(destination.parent)
+
+        os.replace(stage, destination)
+        _fsync_directory(destination.parent)
+
+        _remove_tree_path(previous)
+        marker.unlink(missing_ok=True)
+        _fsync_directory(destination.parent)
+    except Exception as exc:
+        try:
+            _rollback_tree_replacement(
+                destination,
+                stage,
+                previous,
+                had_destination,
+            )
+        except Exception as rollback_exc:
+            raise RuntimeError(
+                f"Atomic replacement failed for {destination}: {exc}. "
+                "The durable recovery marker was preserved because automatic "
+                f"rollback also failed: {rollback_exc}"
+            ) from exc
+        raise
 
 
 def _restore_backup_contents(name: str, progress: Progress | None = None) -> dict[str, Any]:

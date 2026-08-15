@@ -21,7 +21,7 @@ mod = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = mod
 spec.loader.exec_module(mod)
 
-assert mod.INSTALLER_VERSION == "2.1.19"
+assert mod.INSTALLER_VERSION == "2.1.20"
 
 assert hasattr(mod, "stat")
 
@@ -243,4 +243,4 @@ assert 'legacy_web.operation["active"]' not in manager_source
 assert "supervisor_store_request(" in component_source
 assert "expected_version = installer_core.normalise_version(_remote_version(spec))" in component_source
 
-print("Switch Vision Installer v2.1.19 hardening regression: PASS")
+print("Switch Vision Installer v2.1.20 hardening regression: PASS")
