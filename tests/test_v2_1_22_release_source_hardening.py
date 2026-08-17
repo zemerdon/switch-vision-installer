@@ -26,7 +26,7 @@ assert installer.OFFICIAL_RELEASE_API_URL == (
 )
 
 config_text = CONFIG.read_text(encoding="utf-8")
-assert 'version: "2.1.22"' in config_text
+assert 'version: "2.1.23"' in config_text
 assert "allow_custom_release_source: false" in config_text
 assert "allow_custom_release_source: bool" in config_text
 
