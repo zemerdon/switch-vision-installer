@@ -19,7 +19,7 @@ installer = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = installer
 spec.loader.exec_module(installer)
 
-assert installer.INSTALLER_VERSION == "2.1.22"
+assert installer.INSTALLER_VERSION == "2.1.23"
 assert installer.OFFICIAL_RELEASE_API_URL == (
     "https://api.github.com/repos/zemerdon/"
     "switch-vision-releases/releases/latest"

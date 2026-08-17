@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.1.23 — Immutable Home Assistant base image
+
+- Pin the Installer container to the resolved multi-architecture `ghcr.io/home-assistant/base` OCI index digest instead of the mutable `latest` tag.
+- Preserve amd64 and arm64 platform selection through the pinned multi-arch manifest.
+- Prevent future Installer rebuilds from silently consuming a different Home Assistant base image without an explicit source change.
+- Preserve release-source trust enforcement, archive and HTTP limits, crash-atomic replacement, backup integrity, restore handling, and component management unchanged.
+
 ## v2.1.22 — Official release-source hardening
 
 - Treat the official `zemerdon/switch-vision-releases` GitHub API endpoint as the only trusted Core release source by default.
