@@ -1,5 +1,5 @@
 name: Switch Vision Installer
-version: "2.1.21"
+version: "2.1.22"
 slug: switch_vision_installer
 description: Install and update every Switch Vision component from the official repositories.
 url: https://github.com/zemerdon/switch-vision-installer
@@ -25,6 +25,7 @@ map:
     read_only: false
 options:
   release_api_url: https://api.github.com/repos/zemerdon/switch-vision-releases/releases/latest
+  allow_custom_release_source: false
   release_asset_pattern: switch-vision-*.zip
   preserve_custom_assets: true
   create_backup: true
@@ -32,6 +33,7 @@ options:
   backup_retention: 5
 schema:
   release_api_url: url
+  allow_custom_release_source: bool
   release_asset_pattern: str
   preserve_custom_assets: bool
   create_backup: bool

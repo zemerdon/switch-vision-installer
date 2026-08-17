@@ -21,7 +21,7 @@ mod = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = mod
 spec.loader.exec_module(mod)
 
-assert mod.INSTALLER_VERSION == "2.1.21"
+assert mod.INSTALLER_VERSION == "2.1.22"
 
 assert hasattr(mod, "stat")
 
@@ -46,6 +46,7 @@ release_payload = {
 mod.request_json = lambda url: release_payload
 mod.load_options = lambda: {
     "release_api_url": "https://example.invalid/releases/latest",
+    "allow_custom_release_source": True,
     "release_asset_pattern": "switch-vision-*.zip",
     "allow_prerelease": False,
 }

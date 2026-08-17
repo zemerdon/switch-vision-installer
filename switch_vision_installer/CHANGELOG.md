@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.1.22 — Official release-source hardening
+
+- Treat the official `zemerdon/switch-vision-releases` GitHub API endpoint as the only trusted Core release source by default.
+- Reject a changed `release_api_url` before any network request unless `allow_custom_release_source` is explicitly enabled.
+- Keep advanced/custom release-source support available as an intentional opt-in for development and recovery use.
+- Preserve exact asset-name checks, trusted SHA-256 validation, archive limits, crash-atomic replacement, backup integrity, and component-manager behaviour unchanged.
+- Add a regression proving untrusted release APIs are not contacted without explicit opt-in.
+
 ## v2.1.21 — Archive and ingress request hardening
 
 - Adds strict release ZIP limits for archive entry count, individual uncompressed member size, total uncompressed size, and compression ratio.
