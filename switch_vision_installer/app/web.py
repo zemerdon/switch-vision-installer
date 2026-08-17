@@ -23,6 +23,13 @@ SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN", "")
 operation_lock = threading.Lock()
 operation = {"active": False, "kind": None, "message": "Ready.", "percent": 0, "result": None, "error": None}
 
+MAX_POST_BODY_BYTES = 64 * 1024
+
+class RequestBodyError(RuntimeError):
+    def __init__(self, message: str, status: int) -> None:
+        super().__init__(message)
+        self.status = status
+
 
 def installer_ui_preferences() -> dict[str, str]:
     """Read and validate shared Switch Vision Installer UI preferences."""
@@ -290,7 +297,26 @@ class Handler(BaseHTTPRequestHandler):
     def send_json(self, payload: object, code: int = 200) -> None:
         data=json.dumps(payload,indent=2).encode(); self.send_response(code); self.send_header("Content-Type","application/json; charset=utf-8"); self.send_header("Cache-Control","no-store"); self.send_header("Content-Length",str(len(data))); self.end_headers(); self.wfile.write(data)
     def body(self) -> dict:
-        length=int(self.headers.get("Content-Length","0")); return json.loads(self.rfile.read(length).decode() or "{}")
+        raw_length = self.headers.get("Content-Length", "0")
+        try:
+            length = int(raw_length)
+        except (TypeError, ValueError) as exc:
+            raise RequestBodyError("Invalid Content-Length header.", 400) from exc
+        if length < 0:
+            raise RequestBodyError("Invalid Content-Length header.", 400)
+        if length > MAX_POST_BODY_BYTES:
+            raise RequestBodyError(
+                f"Request body exceeds the {MAX_POST_BODY_BYTES}-byte limit.",
+                413,
+            )
+        raw = self.rfile.read(length)
+        try:
+            payload = json.loads(raw.decode("utf-8") or "{}")
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise RequestBodyError("Request body must contain valid JSON.", 400) from exc
+        if not isinstance(payload, dict):
+            raise RequestBodyError("Request JSON body must be an object.", 400)
+        return payload
     def do_GET(self) -> None:
         path=self.path.split("?",1)[0]
         try:
@@ -366,6 +392,8 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/restart-unifi2mqtt":
                 return self.send_json(run_locked("restart unifi2mqtt", lambda: {"ok": True, "requested": True, "supervisor": supervisor_request(f"/addons/{find_unifi2mqtt_slug()}/restart")}))
             self.send_error(404)
+        except RequestBodyError as exc:
+            self.send_json({"ok": False, "error": str(exc)}, exc.status)
         except OperationBusyError as exc:
             self.send_json({"ok": False, "error": str(exc)}, 409)
         except Exception as exc:

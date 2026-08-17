@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.1.21 — Archive and ingress request hardening
+
+- Adds strict release ZIP limits for archive entry count, individual uncompressed member size, total uncompressed size, and compression ratio.
+- Keeps existing absolute-path, parent-traversal, and staging-boundary checks before extraction.
+- Caps Installer JSON POST request bodies at 64 KiB.
+- Rejects invalid or negative `Content-Length` values and malformed/non-object JSON with HTTP 400.
+- Returns HTTP 413 for oversized request bodies.
+- No changes to backup/restore semantics, crash-atomic Core replacement, Supervisor app migration, or release checksum verification.
+
 ## v2.1.20
 
 - Replaces Core and dashboard frontend trees through same-directory staging and atomic rename promotion instead of deleting the live destination before copying the replacement.

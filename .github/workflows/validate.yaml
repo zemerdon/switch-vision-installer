@@ -39,7 +39,8 @@ jobs:
             tests/test_component_manager.py \
             tests/test_ui_state.py \
             tests/test_v2_1_19_hardening.py \
-            tests/test_v2_1_20_atomic_replace.py
+            tests/test_v2_1_20_atomic_replace.py \
+            tests/test_v2_1_21_archive_http_limits.py
 
       - name: Check shell syntax
         run: bash -n switch_vision_installer/run.sh
@@ -63,6 +64,9 @@ jobs:
 
       - name: Validate crash-atomic replacement
         run: python tests/test_v2_1_20_atomic_replace.py
+
+      - name: Validate archive and HTTP request hardening
+        run: python tests/test_v2_1_21_archive_http_limits.py
 
       - name: Validate release metadata
         run: |
