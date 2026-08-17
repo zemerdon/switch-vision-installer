@@ -17,7 +17,7 @@ import urllib.error
 import zipfile
 import re
 
-INSTALLER_VERSION = "2.1.21"
+INSTALLER_VERSION = "2.1.22"
 OPTIONS_PATH = Path(os.environ.get("SV_INSTALLER_OPTIONS", "/data/options.json"))
 STATE_PATH = Path(os.environ.get("SV_INSTALLER_STATE", "/data/state.json"))
 WORK_DIR = Path(os.environ.get("SV_INSTALLER_WORK", "/data/work"))
@@ -51,6 +51,11 @@ MAX_ARCHIVE_ENTRIES = 20_000
 MAX_ARCHIVE_TOTAL_UNCOMPRESSED_BYTES = 512 * 1024 * 1024
 MAX_ARCHIVE_MEMBER_UNCOMPRESSED_BYTES = 128 * 1024 * 1024
 MAX_ARCHIVE_COMPRESSION_RATIO = 200.0
+
+OFFICIAL_RELEASE_API_URL = (
+    "https://api.github.com/repos/zemerdon/"
+    "switch-vision-releases/releases/latest"
+)
 
 SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN", "")
 
@@ -726,7 +731,8 @@ class InstallResult:
 
 def load_options() -> dict[str, Any]:
     defaults = {
-        "release_api_url": "https://api.github.com/repos/zemerdon/switch-vision-releases/releases/latest",
+        "release_api_url": OFFICIAL_RELEASE_API_URL,
+        "allow_custom_release_source": False,
         "release_asset_pattern": "switch-vision-*.zip",
         "preserve_custom_assets": True,
         "create_backup": True,
@@ -741,6 +747,19 @@ def load_options() -> dict[str, Any]:
     return defaults
 
 
+def validated_release_api_url(options: dict[str, Any]) -> str:
+    url = str(options.get("release_api_url") or OFFICIAL_RELEASE_API_URL).strip()
+    if url == OFFICIAL_RELEASE_API_URL:
+        return url
+    if not bool(options.get("allow_custom_release_source", False)):
+        raise RuntimeError(
+            "Custom Core release sources are disabled. Switch Vision Installer "
+            "only trusts the official switch-vision-releases GitHub API endpoint "
+            "unless allow_custom_release_source is explicitly enabled."
+        )
+    return url
+
+
 def request_json(url: str) -> dict[str, Any]:
     request = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json", "User-Agent": f"Switch-Vision-Installer/{INSTALLER_VERSION}"})
     with urllib.request.urlopen(request, timeout=30) as response:
@@ -749,7 +768,8 @@ def request_json(url: str) -> dict[str, Any]:
 
 def latest_release() -> dict[str, Any]:
     options = load_options()
-    payload = request_json(str(options["release_api_url"]))
+    release_api_url = validated_release_api_url(options)
+    payload = request_json(release_api_url)
     if payload.get("prerelease") and not options.get("allow_prerelease"):
         raise RuntimeError("Latest GitHub release is marked as a prerelease.")
 
