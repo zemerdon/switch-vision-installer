@@ -20,7 +20,7 @@ assert spec and spec.loader
 installer = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = installer
 spec.loader.exec_module(installer)
-assert installer.INSTALLER_VERSION == "2.1.22"
+assert installer.INSTALLER_VERSION == "2.1.23"
 
 def make_zip(path: Path, entries):
     with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as zf:

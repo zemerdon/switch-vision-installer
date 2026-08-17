@@ -18,7 +18,7 @@ mod = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = mod
 spec.loader.exec_module(mod)
 
-assert mod.INSTALLER_VERSION == "2.1.22"
+assert mod.INSTALLER_VERSION == "2.1.23"
 
 with tempfile.TemporaryDirectory() as td:
     digest_base = Path(td)
