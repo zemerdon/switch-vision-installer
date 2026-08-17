@@ -17,7 +17,7 @@ import urllib.error
 import zipfile
 import re
 
-INSTALLER_VERSION = "2.1.20"
+INSTALLER_VERSION = "2.1.21"
 OPTIONS_PATH = Path(os.environ.get("SV_INSTALLER_OPTIONS", "/data/options.json"))
 STATE_PATH = Path(os.environ.get("SV_INSTALLER_STATE", "/data/state.json"))
 WORK_DIR = Path(os.environ.get("SV_INSTALLER_WORK", "/data/work"))
@@ -46,6 +46,11 @@ BUNDLED_ASSET_NAMES = {
     "faceplates": {"sv-dark.png", "sv-light.png", "README.txt"},
 }
 Progress = Callable[[str, int], None]
+
+MAX_ARCHIVE_ENTRIES = 20_000
+MAX_ARCHIVE_TOTAL_UNCOMPRESSED_BYTES = 512 * 1024 * 1024
+MAX_ARCHIVE_MEMBER_UNCOMPRESSED_BYTES = 128 * 1024 * 1024
+MAX_ARCHIVE_COMPRESSION_RATIO = 200.0
 
 SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN", "")
 
@@ -973,15 +978,55 @@ def tree_digest(path: Path) -> str | None:
 
 
 def safe_extract(archive: Path, destination: Path) -> None:
+    """Extract a release ZIP with path and resource-exhaustion limits."""
     destination = destination.resolve()
     with zipfile.ZipFile(archive) as zf:
-        for info in zf.infolist():
+        members = zf.infolist()
+        if len(members) > MAX_ARCHIVE_ENTRIES:
+            raise RuntimeError(
+                "Release archive contains too many entries: "
+                f"{len(members)} > {MAX_ARCHIVE_ENTRIES}."
+            )
+
+        total_uncompressed = 0
+        for info in members:
             member = PurePosixPath(info.filename)
             if member.is_absolute() or ".." in member.parts:
                 raise RuntimeError(f"Unsafe archive member: {info.filename}")
+
             target = (destination / Path(*member.parts)).resolve()
             if destination not in target.parents and target != destination:
                 raise RuntimeError(f"Archive path escapes staging: {info.filename}")
+
+            file_size = max(0, int(info.file_size))
+            compressed_size = max(0, int(info.compress_size))
+
+            if file_size > MAX_ARCHIVE_MEMBER_UNCOMPRESSED_BYTES:
+                raise RuntimeError(
+                    "Release archive member is too large after decompression: "
+                    f"{info.filename} ({file_size} bytes)."
+                )
+
+            total_uncompressed += file_size
+            if total_uncompressed > MAX_ARCHIVE_TOTAL_UNCOMPRESSED_BYTES:
+                raise RuntimeError(
+                    "Release archive exceeds the total uncompressed size limit: "
+                    f"{total_uncompressed} bytes."
+                )
+
+            if file_size > 0:
+                if compressed_size == 0:
+                    raise RuntimeError(
+                        "Release archive member has an invalid compression ratio: "
+                        f"{info.filename}."
+                    )
+                ratio = file_size / compressed_size
+                if ratio > MAX_ARCHIVE_COMPRESSION_RATIO:
+                    raise RuntimeError(
+                        "Release archive member exceeds the compression-ratio limit: "
+                        f"{info.filename} ({ratio:.1f}:1)."
+                    )
+
         zf.extractall(destination)
 
 
