@@ -1,0 +1,63 @@
+name: Audit live component contracts
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    if: ${{ github.event.pull_request.head.ref == 'audit/live-component-contracts' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Installer
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Exercise live component resolver
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import sys
+
+          app = Path('switch_vision_installer/app').resolve()
+          sys.path.insert(0, str(app))
+          import component_manager as cm
+
+          expected = {
+              'core': '2.4.0',
+              'discovery': '2.1.26',
+              'snmp2mqtt': '0.9.13',
+              'unifi2mqtt': '2.0.47',
+              'installer': '2.1.23',
+          }
+          expected_repos = {
+              'core': 'switch-vision-releases',
+              'discovery': 'switch-vision-discovery',
+              'snmp2mqtt': 'switch-vision-snmp2mqtt-addon',
+              'unifi2mqtt': 'switch-vision-unifi2mqtt',
+              'installer': 'switch-vision-installer',
+          }
+
+          cm.clear_cache()
+          for component_id, wanted in expected.items():
+              spec = cm._spec(component_id)
+              assert spec.repositories == (expected_repos[component_id],), (component_id, spec.repositories)
+              resolved = cm.resolve_repository(spec)
+              assert resolved == expected_repos[component_id], (component_id, resolved)
+              actual = cm._remote_version(spec)
+              print(f'{component_id}: repository={resolved} latest={actual}')
+              assert actual == wanted, f'{component_id}: expected {wanted}, got {actual}'
+
+          snapshot_order = ['core', 'discovery', 'snmp2mqtt', 'unifi2mqtt']
+          assert [x for x in snapshot_order] == ['core', 'discovery', 'snmp2mqtt', 'unifi2mqtt']
+          assert cm._spec('discovery').min_core == '2.1.5'
+          assert cm._spec('unifi2mqtt').optional is True
+          print('Installer live component resolver contract: PASS')
+          PY
