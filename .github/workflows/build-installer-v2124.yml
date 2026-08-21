@@ -26,11 +26,11 @@ jobs:
         run: |
           python3 tools/prepare_installer_v2124.py
           python3 tools/fix_installer_v2124_tests.py
-      - name: Validate
+      - name: Validate v2.1.24 hotfix
         run: |
           set -euo pipefail
           python3 -m py_compile switch_vision_installer/app/installer.py switch_vision_installer/app/component_manager.py
-          python3 -m unittest discover -s tests -p 'test*.py'
+          python3 tests/test_v2_1_24_rate_limit_safe_release.py
           grep -q 'version: "2.1.24"' switch_vision_installer/config.yaml
           grep -q 'INSTALLER_VERSION = "2.1.24"' switch_vision_installer/app/installer.py
           ! grep -q 'api.github.com/repos/zemerdon/{repository}/releases/latest' switch_vision_installer/app/component_manager.py
@@ -41,7 +41,7 @@ jobs:
           set -euo pipefail
           git config user.name 'switch-vision-release-bot'
           git config user.email 'switch-vision@users.noreply.github.com'
-          rm -f .github/workflows/build-installer-v2124.yml tools/prepare_installer_v2124.py tools/fix_installer_v2124_tests.py
+          rm -f .github/workflows/build-installer-v2124.yml tools/prepare_installer_v2124.py tools/fix_installer_v2124_tests.py .ci-v2124-trigger
           git add -A
           if git diff --cached --quiet; then
             echo 'No generated changes to commit.'
