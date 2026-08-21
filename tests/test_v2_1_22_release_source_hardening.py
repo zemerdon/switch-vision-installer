@@ -19,14 +19,14 @@ installer = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = installer
 spec.loader.exec_module(installer)
 
-assert installer.INSTALLER_VERSION == "2.1.23"
+assert installer.INSTALLER_VERSION == "2.1.24"
 assert installer.OFFICIAL_RELEASE_API_URL == (
     "https://api.github.com/repos/zemerdon/"
     "switch-vision-releases/releases/latest"
 )
 
 config_text = CONFIG.read_text(encoding="utf-8")
-assert 'version: "2.1.23"' in config_text
+assert 'version: "2.1.24"' in config_text
 assert "allow_custom_release_source: false" in config_text
 assert "allow_custom_release_source: bool" in config_text
 

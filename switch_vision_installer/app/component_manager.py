@@ -133,9 +133,7 @@ def resolve_repository(spec: ComponentSpec) -> str:
         for repository in spec.repositories:
             try:
                 if spec.kind == "core":
-                    _github_request(
-                        f"https://api.github.com/repos/zemerdon/{repository}/releases/latest"
-                    )
+                    return repository
                 elif spec.config_path:
                     text = _raw_text(repository, spec.config_path)
                     if not _yaml_version(text):
@@ -159,10 +157,7 @@ def repository_url(spec: ComponentSpec) -> str:
 def _remote_version(spec: ComponentSpec) -> str:
     repository = resolve_repository(spec)
     if spec.kind == "core":
-        payload = _github_request(
-            f"https://api.github.com/repos/zemerdon/{repository}/releases/latest"
-        )
-        return installer_core.normalise_version(payload.get("tag_name") or payload.get("name"))
+        return installer_core.official_latest_release_version()
     if not spec.config_path:
         return ""
     return _yaml_version(_raw_text(repository, spec.config_path))
@@ -331,25 +326,8 @@ def component_changelog(component_id: str) -> dict[str, Any]:
     spec = _spec(component_id)
     repository = resolve_repository(spec)
     if spec.kind == "core":
-        payload = _github_request(
-            f"https://api.github.com/repos/zemerdon/{repository}/releases?per_page=100"
-        )
-        if not isinstance(payload, list):
-            raise RuntimeError("Core release history returned an unexpected response.")
-        sections: list[str] = []
-        for release in payload:
-            if not isinstance(release, dict) or release.get("draft"):
-                continue
-            if release.get("prerelease") and not installer_core.load_options().get("allow_prerelease"):
-                continue
-            version = installer_core.normalise_version(
-                release.get("tag_name") or release.get("name")
-            )
-            if not version:
-                continue
-            body = str(release.get("body") or "").strip()
-            sections.append(f"## v{version}\n\n{body or 'No release notes published.'}")
-        text = "\n\n".join(sections)
+        # The repository changelog is authoritative and avoids GitHub REST quota.
+        text = _raw_text(repository, "CHANGELOG.md")
     else:
         if not spec.changelog_path:
             text = "No changelog source is configured for this component."
