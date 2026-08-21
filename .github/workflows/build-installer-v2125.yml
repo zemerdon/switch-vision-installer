@@ -73,13 +73,18 @@ jobs:
           grep -Fq "n===null||n===undefined||n===''" switch_vision_installer/www/installer.js
           git diff --check
 
-      - name: Commit clean final source to feature branch
+      - name: Commit tested product source to feature branch
         shell: bash
         run: |
           set -euo pipefail
           git config user.name 'switch-vision-release-bot'
           git config user.email 'switch-vision@users.noreply.github.com'
-          rm -f .github/workflows/build-installer-v2125.yml tools/prepare_installer_v2125.py tools/fix_v2125_test_version.py
+          # GITHUB_TOKEN cannot create/update workflow files. Restore the
+          # permanent validator and leave this temporary builder untouched;
+          # both workflow mutations are applied afterward by user-authored
+          # connector commits.
+          git checkout HEAD -- .github/workflows/validate.yaml .github/workflows/build-installer-v2125.yml
+          rm -f tools/prepare_installer_v2125.py tools/fix_v2125_test_version.py
           git add -A
           git commit -m 'Release Switch Vision Installer v2.1.25'
           git push origin HEAD:${{ github.event.pull_request.head.ref }}
