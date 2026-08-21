@@ -12,13 +12,13 @@ fake_installer = types.ModuleType("installer")
 fake_installer.INSTALLER_VERSION = "2.1.19"
 fake_installer.COMPONENT_DIR = Path("/tmp/no-component")
 fake_installer.normalise_version = lambda value: str(value or "").strip().lstrip("v")
-fake_installer.installed_version = lambda: "2.1.5"
+fake_installer.installed_version = lambda: "2.3.10"
 fake_installer.load_options = lambda: {"allow_prerelease": False}
-fake_installer.discovery_status = lambda: {"installed": True, "version": "2.1.7", "state": "started", "slug": "repo_discovery"}
-fake_installer.snmp2mqtt_status = lambda: {"installed": True, "version": "0.9.7", "state": "started", "slug": "repo_snmp"}
+fake_installer.discovery_status = lambda: {"installed": True, "version": "2.1.34", "state": "started", "slug": "repo_discovery"}
+fake_installer.snmp2mqtt_status = lambda: {"installed": True, "version": "0.9.15", "state": "started", "slug": "repo_snmp"}
 fake_installer.unifi2mqtt_status = lambda: {"installed": False, "version": None, "state": "not_installed", "slug": "repo_unifi"}
 fake_installer._find_addon = lambda *args, **kwargs: {"slug": "repo_installer"}
-fake_installer.download_and_install = lambda progress=None: types.SimpleNamespace(__dict__={"ok": True, "version": "2.1.5", "installed": [], "unchanged": ["Core"], "warnings": [], "required_actions": []})
+fake_installer.download_and_install = lambda progress=None: types.SimpleNamespace(__dict__={"ok": True, "version": "2.4.8", "installed": [], "unchanged": ["Core"], "warnings": [], "required_actions": []})
 sys.modules["installer"] = fake_installer
 
 fake_repo = types.ModuleType("repository_setup")
@@ -45,7 +45,7 @@ assert snmp.repositories == ("switch-vision-snmp2mqtt-addon",)
 assert snmp.config_path == "switch-vision-snmp2mqtt/config.yaml"
 
 discovery = module._spec("discovery")
-assert discovery.min_core == "2.1.5"
+assert discovery.min_core == "2.3.10"
 
 order = [spec.component_id for spec in module.COMPONENTS]
 assert order == ["core", "discovery", "snmp2mqtt", "unifi2mqtt", "installer"]
@@ -58,25 +58,26 @@ raw_calls = []
 def raw_app_repository(repo, path):
     raw_calls.append((repo, path))
     if repo == "switch-vision-snmp2mqtt-addon":
-        return 'name: Switch Vision SNMP2MQTT\nversion: "0.9.7"\n'
+        return 'name: Switch Vision SNMP2MQTT\nversion: "0.9.15"\n'
     raise FileNotFoundError(repo)
 module._raw_text = raw_app_repository
 assert module.resolve_repository(snmp) == "switch-vision-snmp2mqtt-addon"
 assert all(repo != "switch-vision-snmp2mqtt" for repo, _ in raw_calls)
 
-# Discovery dependency must block a direct update on old Core.
-fake_installer.installed_version = lambda: "2.1.4"
-module._remote_version = lambda spec: {"discovery":"2.1.7","core":"2.1.5","snmp2mqtt":"0.9.7","unifi2mqtt":"2.0.38","installer":"2.1.19"}.get(spec.component_id, "")
+# Discovery dependency must block a direct update on Core older than the
+# Calibration Profile API contract introduced in Core v2.3.10.
+fake_installer.installed_version = lambda: "2.3.9"
+module._remote_version = lambda spec: {"discovery":"2.1.34","core":"2.3.10","snmp2mqtt":"0.9.15","unifi2mqtt":"2.0.47","installer":"2.1.26"}.get(spec.component_id, "")
 module.clear_cache()
 row = module._component_status(discovery)
 assert row["dependency_ok"] is False
 assert row["status"] == "dependency_mismatch"
-assert "v2.1.5+" in row["dependency_note"]
-assert "Installed Core: v2.1.4" in row["dependency_note"]
+assert "v2.3.10+" in row["dependency_note"]
+assert "Installed Core: v2.3.9" in row["dependency_note"]
 
 # A current Discovery with an unmet dependency still needs attention. If the
 # published Core cannot satisfy that dependency, Update All must be blocked.
-module._remote_version = lambda spec: {"discovery":"2.1.7","core":"2.1.4","snmp2mqtt":"0.9.7","unifi2mqtt":"2.0.38","installer":"2.1.19"}.get(spec.component_id, "")
+module._remote_version = lambda spec: {"discovery":"2.1.34","core":"2.3.9","snmp2mqtt":"0.9.15","unifi2mqtt":"2.0.47","installer":"2.1.26"}.get(spec.component_id, "")
 module.clear_cache()
 snapshot = module.component_status()
 discovery_row = next(item for item in snapshot["components"] if item["id"] == "discovery")
@@ -86,7 +87,7 @@ assert "Publish/update Core first" in snapshot["update_all_blocked_reason"]
 
 # Once a compatible Core is published, Update All is allowed and upgrades Core
 # first; Discovery remains marked Needs attention only until that Core update runs.
-module._remote_version = lambda spec: {"discovery":"2.1.7","core":"2.1.5","snmp2mqtt":"0.9.7","unifi2mqtt":"2.0.38","installer":"2.1.19"}.get(spec.component_id, "")
+module._remote_version = lambda spec: {"discovery":"2.1.34","core":"2.3.10","snmp2mqtt":"0.9.15","unifi2mqtt":"2.0.47","installer":"2.1.26"}.get(spec.component_id, "")
 module.clear_cache()
 snapshot = module.component_status()
 assert snapshot["update_all_blocked"] is False
@@ -94,15 +95,15 @@ assert snapshot["updates_available"] >= 1
 
 print("repository identity/dependency regressions: PASS")
 
-# Installer self-update safety.
-fake_installer.INSTALLER_VERSION = "2.1.18"
-fake_installer.installed_version = lambda: "2.1.5"
+# Installer self-update safety remains independent of the Discovery dependency.
+fake_installer.INSTALLER_VERSION = "2.1.25"
+fake_installer.installed_version = lambda: "2.3.10"
 module._remote_version = lambda spec: {
-    "discovery": "2.1.7",
-    "core": "2.1.5",
-    "snmp2mqtt": "0.9.7",
-    "unifi2mqtt": "2.0.38",
-    "installer": "2.1.19",
+    "discovery": "2.1.34",
+    "core": "2.3.10",
+    "snmp2mqtt": "0.9.15",
+    "unifi2mqtt": "2.0.47",
+    "installer": "2.1.26",
 }.get(spec.component_id, "")
 module.clear_cache()
 snapshot = module.component_status()
