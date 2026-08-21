@@ -24,7 +24,9 @@ jobs:
           python-version: "3.12"
 
       - name: Prepare Installer v2.1.25
-        run: python tools/prepare_installer_v2125.py
+        run: |
+          python tools/prepare_installer_v2125.py
+          python tools/fix_v2125_test_version.py
 
       - name: Validate shell and frontend syntax
         run: |
@@ -64,6 +66,7 @@ jobs:
           PY
           )" = "2.1.25"
           grep -Fq 'INSTALLER_VERSION = "2.1.25"' switch_vision_installer/app/installer.py
+          grep -Fq 'assert mod.INSTALLER_VERSION == "2.1.25"' tests/test_repository_backup_model.py
           grep -Fq 'tests/test_*.py' .github/workflows/validate.yaml
           grep -Fq 'test_v2_1_24_rate_limit_safe_release.py' <(printf '%s\n' tests/test_*.py)
           grep -Fq 'Custom release API URL' switch_vision_installer/translations/en.yaml
@@ -76,7 +79,7 @@ jobs:
           set -euo pipefail
           git config user.name 'switch-vision-release-bot'
           git config user.email 'switch-vision@users.noreply.github.com'
-          rm -f .github/workflows/build-installer-v2125.yml tools/prepare_installer_v2125.py
+          rm -f .github/workflows/build-installer-v2125.yml tools/prepare_installer_v2125.py tools/fix_v2125_test_version.py
           git add -A
           git commit -m 'Release Switch Vision Installer v2.1.25'
           git push origin HEAD:${{ github.event.pull_request.head.ref }}
