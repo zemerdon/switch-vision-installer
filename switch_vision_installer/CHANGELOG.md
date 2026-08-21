@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.1.24 — GitHub rate-limit-safe Core release discovery
+
+- Stop using unauthenticated `api.github.com` requests for normal official Core version/status/install discovery.
+- Resolve the latest public Core version through GitHub's standard `/releases/latest` redirect and deterministic release asset names.
+- Continue requiring the exact `switch-vision-<version>.zip` asset and its published `.sha256` checksum before installation.
+- Read the Core changelog from the public repository instead of the GitHub releases REST API.
+- Preserve explicit custom release API support behind `allow_custom_release_source`; only opted-in custom sources use the structured API path.
+- Prevent exhausted unauthenticated GitHub REST quotas from blocking normal Switch Vision update checks.
+
 ## v2.1.23 — Immutable Home Assistant base image
 
 - Pin the Installer container to the resolved multi-architecture `ghcr.io/home-assistant/base` OCI index digest instead of the mutable `latest` tag.

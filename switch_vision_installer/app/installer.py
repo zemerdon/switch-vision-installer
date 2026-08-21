@@ -17,7 +17,7 @@ import urllib.error
 import zipfile
 import re
 
-INSTALLER_VERSION = "2.1.23"
+INSTALLER_VERSION = "2.1.24"
 OPTIONS_PATH = Path(os.environ.get("SV_INSTALLER_OPTIONS", "/data/options.json"))
 STATE_PATH = Path(os.environ.get("SV_INSTALLER_STATE", "/data/state.json"))
 WORK_DIR = Path(os.environ.get("SV_INSTALLER_WORK", "/data/work"))
@@ -55,6 +55,15 @@ MAX_ARCHIVE_COMPRESSION_RATIO = 200.0
 OFFICIAL_RELEASE_API_URL = (
     "https://api.github.com/repos/zemerdon/"
     "switch-vision-releases/releases/latest"
+)
+OFFICIAL_RELEASE_LATEST_URL = (
+    "https://github.com/zemerdon/switch-vision-releases/releases/latest"
+)
+OFFICIAL_RELEASE_DOWNLOAD_BASE = (
+    "https://github.com/zemerdon/switch-vision-releases/releases/download"
+)
+OFFICIAL_RELEASE_RAW_BASE = (
+    "https://raw.githubusercontent.com/zemerdon/switch-vision-releases"
 )
 
 SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN", "")
@@ -766,9 +775,64 @@ def request_json(url: str) -> dict[str, Any]:
         return json.load(response)
 
 
+def official_latest_release_version() -> str:
+    """Resolve the latest public Core tag without consuming GitHub REST quota."""
+    request = urllib.request.Request(
+        OFFICIAL_RELEASE_LATEST_URL,
+        method="HEAD",
+        headers={"User-Agent": f"Switch-Vision-Installer/{INSTALLER_VERSION}"},
+    )
+    with urllib.request.urlopen(request, timeout=30) as response:
+        final_url = str(response.geturl() or "")
+    match = re.search(r"/releases/tag/v?(\d+\.\d+\.\d+)(?:$|[/?#])", final_url)
+    if not match:
+        raise RuntimeError(
+            "GitHub latest-release redirect did not resolve to a semantic Core tag."
+        )
+    return normalise_version(match.group(1))
+
+
+def _official_release_notes(version: str) -> str:
+    url = f"{OFFICIAL_RELEASE_RAW_BASE}/{version}/RELEASE_NOTES.md"
+    request = urllib.request.Request(
+        url,
+        headers={"User-Agent": f"Switch-Vision-Installer/{INSTALLER_VERSION}"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            return response.read().decode("utf-8", errors="replace")
+    except Exception:
+        return ""
+
+
+def official_latest_release() -> dict[str, Any]:
+    """Build trusted official release metadata from deterministic public paths."""
+    version = official_latest_release_version()
+    expected_name = f"switch-vision-{version}.zip"
+    checksum_name = f"{expected_name}.sha256"
+    download_base = f"{OFFICIAL_RELEASE_DOWNLOAD_BASE}/{version}"
+    return {
+        "version": version,
+        "name": f"Switch Vision Core v{version}",
+        "published_at": None,
+        "asset_name": expected_name,
+        "asset_url": f"{download_base}/{expected_name}",
+        "asset_size": None,
+        "asset_digest": None,
+        "html_url": f"https://github.com/zemerdon/switch-vision-releases/releases/tag/{version}",
+        "changelog": _official_release_notes(version),
+        "checksum_asset_name": checksum_name,
+        "checksum_asset_url": f"{download_base}/{checksum_name}",
+    }
+
+
 def latest_release() -> dict[str, Any]:
     options = load_options()
     release_api_url = validated_release_api_url(options)
+    if release_api_url == OFFICIAL_RELEASE_API_URL:
+        return official_latest_release()
+
+    # Explicitly opted-in custom release APIs retain the structured API path.
     payload = request_json(release_api_url)
     if payload.get("prerelease") and not options.get("allow_prerelease"):
         raise RuntimeError("Latest GitHub release is marked as a prerelease.")
