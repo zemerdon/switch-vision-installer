@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.1.26 — Discovery/Core dependency contract correction
+
+- Correct Discovery's minimum Switch Vision Core dependency from v2.1.5 to v2.3.10, matching the Calibration Profile management/storage API contract used by current Discovery releases.
+- Block direct Discovery updates on Core versions older than v2.3.10 and make Update All require/publish a compatible Core before Discovery can proceed.
+- Update the permanent component-manager regression to prove Core v2.3.9 is rejected and v2.3.10 satisfies the dependency.
+- Make `switch_vision_installer/config.yaml` the authoritative Installer release version for CI/container builds instead of duplicating the current version literal in the workflow.
+- Preserve the packaged runtime version path through Docker `BUILD_VERSION` → `SV_INSTALLER_VERSION`, with existing backup, release verification, repository, and self-update behavior unchanged.
+
 ## v2.1.25 — Audit hardening and release metadata cleanup
 
 - Run every permanent Installer regression test automatically in normal PR CI, including the v2.1.24 GitHub rate-limit-safe release test.

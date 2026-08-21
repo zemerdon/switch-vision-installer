@@ -42,7 +42,7 @@ COMPONENTS: tuple[ComponentSpec, ...] = (
         ("switch-vision-discovery",),
         "switch_vision_discovery/config.yaml",
         "switch_vision_discovery/CHANGELOG.md",
-        min_core="2.1.5",
+        min_core="2.3.10",
     ),
     ComponentSpec(
         "snmp2mqtt",
@@ -604,5 +604,4 @@ def update_all(progress: Progress | None = None) -> dict[str, Any]:
         "component_update": "all",
         "completed_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
-
 

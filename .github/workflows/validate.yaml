@@ -16,6 +16,8 @@ jobs:
   validate:
     name: Validate
     runs-on: ubuntu-latest
+    outputs:
+      app_version: ${{ steps.release_metadata.outputs.version }}
     steps:
       - name: Check out repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -56,30 +58,34 @@ jobs:
           done
 
       - name: Validate release metadata
+        id: release_metadata
         run: |
           python - <<'PY'
           from pathlib import Path
+          import os
           import re
 
           config = Path("switch_vision_installer/config.yaml").read_text(encoding="utf-8")
-          backend = Path("switch_vision_installer/app/installer.py").read_text(encoding="utf-8")
           changelog = Path("switch_vision_installer/CHANGELOG.md").read_text(encoding="utf-8")
+          dockerfile = Path("switch_vision_installer/Dockerfile").read_text(encoding="utf-8")
+          web = Path("switch_vision_installer/app/web.py").read_text(encoding="utf-8")
 
           config_match = re.search(r"(?m)^version:\s*[\"']?([^\"'\s#]+)", config)
-          backend_match = re.search(r'(?m)^INSTALLER_VERSION\s*=\s*"([^"]+)"', backend)
-
           assert config_match, "config.yaml version missing"
-          assert backend_match, "INSTALLER_VERSION missing"
-
           config_version = config_match.group(1)
-          backend_version = backend_match.group(1)
 
-          assert config_version == backend_version, (
-              f"Installer version mismatch: config={config_version}, backend={backend_version}"
-          )
           assert f"## v{config_version}" in changelog, (
               f"CHANGELOG.md has no v{config_version} entry"
           )
+          assert 'ENV SV_INSTALLER_VERSION=${BUILD_VERSION}' in dockerfile, (
+              "Dockerfile must expose BUILD_VERSION as SV_INSTALLER_VERSION"
+          )
+          assert 'os.environ.get("SV_INSTALLER_VERSION")' in web, (
+              "Installer web runtime must consume SV_INSTALLER_VERSION"
+          )
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"version={config_version}\n")
 
           print(f"release metadata consistency: PASS (v{config_version})")
           PY
@@ -110,6 +116,6 @@ jobs:
           push: false
           platforms: linux/${{ matrix.arch }}
           build-args: |
-            BUILD_VERSION=2.1.25
+            BUILD_VERSION=${{ needs.validate.outputs.app_version }}
             BUILD_ARCH=${{ matrix.arch }}
           tags: ghcr.io/zemerdon/switch-vision-installer:ci-${{ matrix.arch }}

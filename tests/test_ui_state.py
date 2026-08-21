@@ -9,11 +9,13 @@ index = (WWW / "index.html").read_text(encoding="utf-8")
 installer_js = (WWW / "installer.js").read_text(encoding="utf-8")
 manager_js = (WWW / "component-manager.js").read_text(encoding="utf-8")
 config = (ROOT / "switch_vision_installer" / "config.yaml").read_text(encoding="utf-8")
-backend = (APP / "installer.py").read_text(encoding="utf-8")
+dockerfile = (ROOT / "switch_vision_installer" / "Dockerfile").read_text(encoding="utf-8")
+web = (APP / "web.py").read_text(encoding="utf-8")
 
 config_version = re.search(r'(?m)^version:\s*["\']?([^"\'\s#]+)', config).group(1)
-backend_version = re.search(r'(?m)^INSTALLER_VERSION\s*=\s*"([^"]+)"', backend).group(1)
-assert config_version == backend_version
+assert 'ENV SV_INSTALLER_VERSION=${BUILD_VERSION}' in dockerfile
+assert 'os.environ.get("SV_INSTALLER_VERSION")' in web
+assert 'installer_core.INSTALLER_VERSION = INSTALLER_VERSION' in web
 
 assert 'id="show-changelog"' not in index
 assert 'changelog-history.js' not in index

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -66,10 +67,11 @@ class InstallerReleaseMetadataTests(unittest.TestCase):
         self.assertIn("name: Allow custom release source", text)
         self.assertIn("quota-free GitHub release redirect", text)
 
-    def test_version_metadata_is_2_1_25(self):
+    def test_current_config_still_has_valid_release_version_metadata(self):
         config = (APP / "config.yaml").read_text(encoding="utf-8")
-        self.assertIn('version: "2.1.25"', config)
-        self.assertEqual(installer.INSTALLER_VERSION, "2.1.25")
+        match = re.search(r'(?m)^version:\s*["\']?([^"\'\s#]+)', config)
+        self.assertIsNotNone(match)
+        self.assertRegex(match.group(1), r"^\d+\.\d+\.\d+$")
 
 
 if __name__ == "__main__":

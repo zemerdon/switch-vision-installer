@@ -4,6 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 import importlib.util
 import json
+import re
 import sys
 import tempfile
 
@@ -19,14 +20,20 @@ installer = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = installer
 spec.loader.exec_module(installer)
 
-assert installer.INSTALLER_VERSION == "2.1.25"
+# This regression owns release-source trust, not the current Installer release
+# number. The app version is independently validated by permanent release
+# metadata/runtime-version contracts.
+config_text = CONFIG.read_text(encoding="utf-8")
+config_version_match = re.search(
+    r'(?m)^version:\s*["\']?([^"\'\s#]+)', config_text
+)
+assert config_version_match
+assert re.fullmatch(r"\d+\.\d+\.\d+", config_version_match.group(1))
+
 assert installer.OFFICIAL_RELEASE_API_URL == (
     "https://api.github.com/repos/zemerdon/"
     "switch-vision-releases/releases/latest"
 )
-
-config_text = CONFIG.read_text(encoding="utf-8")
-assert 'version: "2.1.25"' in config_text
 assert "allow_custom_release_source: false" in config_text
 assert "allow_custom_release_source: bool" in config_text
 
