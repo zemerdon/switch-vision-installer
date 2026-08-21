@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.1.25 — Audit hardening and release metadata cleanup
+
+- Run every permanent Installer regression test automatically in normal PR CI, including the v2.1.24 GitHub rate-limit-safe release test.
+- Execute each regression file in its own Python process so module state cannot leak between historical hardening tests.
+- Enrich official Core release display metadata with a quota-free HEAD request to the deterministic release asset URL; official version discovery and installation continue to avoid the GitHub REST API.
+- Render unavailable asset size as unknown instead of incorrectly displaying `0 B`.
+- Clarify Home Assistant options so `release_api_url` is identified as an advanced custom-source setting only; normal official releases use the quota-free GitHub redirect/download path.
+- Preserve deterministic official asset names, published SHA-256 verification, archive limits, atomic replacement, backup/restore behaviour, and component-management semantics unchanged.
+
 ## v2.1.24 — GitHub rate-limit-safe Core release discovery
 
 - Stop using unauthenticated `api.github.com` requests for normal official Core version/status/install discovery.

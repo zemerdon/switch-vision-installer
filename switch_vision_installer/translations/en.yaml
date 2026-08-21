@@ -1,10 +1,13 @@
 configuration:
   release_api_url:
-    name: Release API URL
-    description: GitHub API endpoint used to locate the latest public release.
+    name: Custom release API URL
+    description: Used only when Allow custom release source is enabled. Official releases use the quota-free GitHub release redirect and deterministic download paths.
+  allow_custom_release_source:
+    name: Allow custom release source
+    description: Advanced option. Keep disabled for normal Switch Vision updates; enable only when intentionally using a custom release API.
   release_asset_pattern:
-    name: Release asset pattern
-    description: Filename pattern used to select the installable ZIP.
+    name: Custom release asset pattern
+    description: Filename pattern used only with an explicitly enabled custom release source. Official releases use deterministic asset names.
   preserve_custom_assets:
     name: Preserve custom assets
     description: Preserve custom logos and faceplates that do not conflict with bundled files.

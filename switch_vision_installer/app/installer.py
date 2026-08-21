@@ -17,7 +17,7 @@ import urllib.error
 import zipfile
 import re
 
-INSTALLER_VERSION = "2.1.24"
+INSTALLER_VERSION = "2.1.25"
 OPTIONS_PATH = Path(os.environ.get("SV_INSTALLER_OPTIONS", "/data/options.json"))
 STATE_PATH = Path(os.environ.get("SV_INSTALLER_STATE", "/data/state.json"))
 WORK_DIR = Path(os.environ.get("SV_INSTALLER_WORK", "/data/work"))
@@ -805,19 +805,41 @@ def _official_release_notes(version: str) -> str:
         return ""
 
 
+def _official_release_asset_metadata(url: str) -> dict[str, Any]:
+    """Best-effort public asset metadata without using GitHub REST API quota."""
+    request = urllib.request.Request(
+        url,
+        method="HEAD",
+        headers={"User-Agent": f"Switch-Vision-Installer/{INSTALLER_VERSION}"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            headers = response.headers
+            raw_size = str(headers.get("Content-Length") or "").strip()
+            size = int(raw_size) if raw_size.isdigit() else None
+            if size is not None and size <= 0:
+                size = None
+            modified = str(headers.get("Last-Modified") or "").strip() or None
+            return {"asset_size": size, "published_at": modified}
+    except Exception:
+        return {"asset_size": None, "published_at": None}
+
+
 def official_latest_release() -> dict[str, Any]:
     """Build trusted official release metadata from deterministic public paths."""
     version = official_latest_release_version()
     expected_name = f"switch-vision-{version}.zip"
     checksum_name = f"{expected_name}.sha256"
     download_base = f"{OFFICIAL_RELEASE_DOWNLOAD_BASE}/{version}"
+    asset_url = f"{download_base}/{expected_name}"
+    display_metadata = _official_release_asset_metadata(asset_url)
     return {
         "version": version,
         "name": f"Switch Vision Core v{version}",
-        "published_at": None,
+        "published_at": display_metadata.get("published_at"),
         "asset_name": expected_name,
-        "asset_url": f"{download_base}/{expected_name}",
-        "asset_size": None,
+        "asset_url": asset_url,
+        "asset_size": display_metadata.get("asset_size"),
         "asset_digest": None,
         "html_url": f"https://github.com/zemerdon/switch-vision-releases/releases/tag/{version}",
         "changelog": _official_release_notes(version),

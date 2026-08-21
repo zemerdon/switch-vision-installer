@@ -41,6 +41,7 @@ class InstallerRateLimitSafeReleaseTests(unittest.TestCase):
 
     def test_official_metadata_is_deterministic_and_checksum_backed(self):
         with patch.object(installer, "official_latest_release_version", return_value="2.4.3"), \
+             patch.object(installer, "_official_release_asset_metadata", return_value={"asset_size": None, "published_at": None}), \
              patch.object(installer, "_official_release_notes", return_value="notes"):
             release = installer.official_latest_release()
         self.assertEqual(release["asset_name"], "switch-vision-2.4.3.zip")
