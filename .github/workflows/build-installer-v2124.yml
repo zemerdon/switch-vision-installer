@@ -23,7 +23,9 @@ jobs:
         with:
           python-version: '3.12'
       - name: Prepare hotfix
-        run: python3 tools/prepare_installer_v2124.py
+        run: |
+          python3 tools/prepare_installer_v2124.py
+          python3 tools/fix_installer_v2124_tests.py
       - name: Validate
         run: |
           set -euo pipefail
@@ -39,7 +41,7 @@ jobs:
           set -euo pipefail
           git config user.name 'switch-vision-release-bot'
           git config user.email 'switch-vision@users.noreply.github.com'
-          rm -f .github/workflows/build-installer-v2124.yml tools/prepare_installer_v2124.py
+          rm -f .github/workflows/build-installer-v2124.yml tools/prepare_installer_v2124.py tools/fix_installer_v2124_tests.py
           git add -A
           if git diff --cached --quiet; then
             echo 'No generated changes to commit.'
