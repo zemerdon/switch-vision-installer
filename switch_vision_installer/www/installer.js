@@ -63,7 +63,7 @@ function toggleChangelog(show){
     card.scrollIntoView({behavior:'smooth',block:'start'});
   }else card.classList.add('hidden');
 }
-function fmtBytes(n){if(!Number.isFinite(Number(n)))return'—';const u=['B','KB','MB','GB'];let i=0,v=Number(n);while(v>=1024&&i<u.length-1){v/=1024;i++;}return`${v.toFixed(i?1:0)} ${u[i]}`;}
+function fmtBytes(n){if(n===null||n===undefined||n==='')return'—';if(!Number.isFinite(Number(n)))return'—';const u=['B','KB','MB','GB'];let i=0,v=Number(n);while(v>=1024&&i<u.length-1){v/=1024;i++;}return`${v.toFixed(i?1:0)} ${u[i]}`;}
 function fmtDate(v){if(!v)return'—';try{return new Date(v).toLocaleString();}catch{return v;}}
 function setControls(on){['check','dry-run','install','create-backup','prune-backups','validate-backup','restore','delete-backup'].forEach(id=>{const needsBackup=['validate-backup','restore','delete-backup'].includes(id);$(id).disabled=on||(needsBackup&&!$('backups').value);});}
 function showResult(html,cls='success'){const el=$('result');el.className=`result ${cls}`;el.innerHTML=html;}
