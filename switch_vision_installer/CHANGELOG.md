@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.1.27 — SNMP2MQTT saved-option migration cleanup
+
+- Remove the known-invalid saved SNMP2MQTT `homeassistant` option through Supervisor before repository-backed SNMP2MQTT updates, while preserving every legitimate MQTT, target-path, generated-YAML and backup setting verbatim.
+- Make the cleanup idempotent: installations without the stray key are not rewritten, and successfully cleaned installations are not written a second time.
+- Pair with Switch Vision SNMP2MQTT v0.9.17, which replaces the deprecated Home Assistant `config` mount declaration with `homeassistant_config` while preserving the existing `/config` container path.
+- Keep the existing v2.1.19 transient App Store/GHCR publication-race retry path unchanged; the HAOS 18.2 live log confirmed that path waits through temporary 404s and succeeds once the image becomes available.
+- Add a permanent regression proving the migration removes only `homeassistant` and preserves MQTT credentials and all real SNMP2MQTT options.
+
 ## v2.1.26 — Discovery/Core dependency contract correction
 
 - Correct Discovery's minimum Switch Vision Core dependency from v2.1.5 to v2.3.10, matching the Calibration Profile management/storage API contract used by current Discovery releases.
