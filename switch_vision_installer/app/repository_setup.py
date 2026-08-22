@@ -37,6 +37,36 @@ def _repository_entry() -> dict[str, Any] | None:
     return None
 
 
+def _sanitize_snmp2mqtt_saved_options(progress: Progress | None = None) -> bool:
+    """Remove the known-invalid legacy `homeassistant` saved option only.
+
+    `homeassistant` is top-level Home Assistant app metadata, never an SNMP2MQTT
+    user option. Some upgraded installations nevertheless have it persisted in
+    Supervisor's saved options, which makes Supervisor warn every time app info
+    is read. Preserve every real user option verbatim and remove only that key.
+    """
+    try:
+        slug = installer_core.find_snmp2mqtt_slug(include_store=False)
+        info = installer_core.addon_info(slug)
+    except Exception:
+        return False
+
+    options = info.get("options") if isinstance(info, dict) else None
+    if not isinstance(options, dict) or "homeassistant" not in options:
+        return False
+
+    cleaned = dict(options)
+    cleaned.pop("homeassistant", None)
+    installer_core.supervisor_request(
+        f"/addons/{slug}/options",
+        method="POST",
+        payload={"options": cleaned},
+    )
+    if progress:
+        progress("Removed obsolete SNMP2MQTT saved Home Assistant metadata…", 3)
+    return True
+
+
 def _wait_for_snmp2mqtt(timeout: int = 120) -> str:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -52,6 +82,11 @@ def _wait_for_snmp2mqtt(timeout: int = 120) -> str:
 
 def ensure_snmp2mqtt_repository(progress: Progress | None = None) -> dict[str, Any]:
     """Ensure the official Switch Vision SNMP2MQTT App repository is registered."""
+    # v2.1.27 migration: sanitize the one known-invalid saved key before the
+    # update flow performs additional Supervisor reads. This intentionally does
+    # not reset options or touch MQTT credentials/target settings.
+    _sanitize_snmp2mqtt_saved_options(progress)
+
     try:
         slug = installer_core.find_snmp2mqtt_slug(include_store=True)
         return {"added": False, "available": True, "slug": slug, "repository": SNMP2MQTT_REPOSITORY}
