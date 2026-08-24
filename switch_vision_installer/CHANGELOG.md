@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.1.30 — Preserve restored SNMP2MQTT Home Assistant options
+
+- Stop deleting the SNMP2MQTT `homeassistant` saved option during repository setup now that SNMP2MQTT 0.9.18 restores it as a valid configuration section.
+- Leave every SNMP2MQTT saved option untouched, including MQTT credentials, generated/manual target selection and the restored Home Assistant values; the SNMP2MQTT wrapper itself enforces Switch Vision's required effective discovery defaults.
+- Replace the old v2.1.27 cleanup regression with a permanent preservation regression proving repository setup performs no SNMP2MQTT option read/write mutation.
+- Preserve Installer private backup trust, ingress boundaries, release verification and all unrelated component-management behavior.
+
 ## v2.1.29 — Private trusted backup storage
 
 - Store new Installer recovery backups in Installer-private `/data/switch-vision-backups` instead of shared `/share` storage.
