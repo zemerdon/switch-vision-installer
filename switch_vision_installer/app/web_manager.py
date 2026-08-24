@@ -6,10 +6,21 @@ import web as legacy_web
 from component_manager import _set_repository_compatibility, component_changelog, component_status, update_all, update_component
 
 
+SUPERVISOR_INGRESS_IP = "172.30.32.2"
+
+
 class Handler(legacy_web.Handler):
     server_version = f"SwitchVisionInstaller/{legacy_web.INSTALLER_VERSION}"
 
+    def _allow_ingress_request(self) -> bool:
+        if self.client_address[0] == SUPERVISOR_INGRESS_IP:
+            return True
+        self.send_json({"ok": False, "error": "Forbidden"}, 403)
+        return False
+
     def do_GET(self) -> None:
+        if not self._allow_ingress_request():
+            return
         parsed = urlsplit(self.path)
         try:
             if parsed.path == "/api/components":
@@ -22,6 +33,8 @@ class Handler(legacy_web.Handler):
         return super().do_GET()
 
     def do_POST(self) -> None:
+        if not self._allow_ingress_request():
+            return
         parsed = urlsplit(self.path)
         try:
             if parsed.path in {

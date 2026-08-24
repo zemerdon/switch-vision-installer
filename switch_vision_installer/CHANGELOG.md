@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.1.28 — Supervisor ingress source gate
+
+- Accept Installer HTTP requests only from the Home Assistant Supervisor ingress proxy before any route dispatch or request-body parsing.
+- Return HTTP 403 for requests originating elsewhere on the internal app network, preventing direct access to privileged install, update, backup, restore and restart routes.
+- Add a permanent regression proving denied GET/POST requests stop before route or body handling while Supervisor ingress remains allowed.
+
 ## v2.1.27 — SNMP2MQTT saved-option migration cleanup
 
 - Remove the known-invalid saved SNMP2MQTT `homeassistant` option through Supervisor before repository-backed SNMP2MQTT updates, while preserving every legitimate MQTT, target-path, generated-YAML and backup setting verbatim.
