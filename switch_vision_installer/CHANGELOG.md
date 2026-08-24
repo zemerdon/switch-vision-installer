@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.1.29 — Private trusted backup storage
+
+- Store new Installer recovery backups in Installer-private `/data/switch-vision-backups` instead of shared `/share` storage.
+- Treat only the private backup directory as a trusted source for validation, restore, retention and deletion.
+- Leave historical `/share/switch-vision-backups` and `/share/switch_vision/installer_backups` contents untouched but do not automatically trust, import, list or restore them.
+- Add a permanent regression proving shared legacy backup directories cannot enter the privileged restore path.
+
 ## v2.1.28 — Supervisor ingress source gate
 
 - Accept Installer HTTP requests only from the Home Assistant Supervisor ingress proxy before any route dispatch or request-body parsing.

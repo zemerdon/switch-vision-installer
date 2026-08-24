@@ -17,11 +17,12 @@ import urllib.error
 import zipfile
 import re
 
-INSTALLER_VERSION = "2.1.25"
+INSTALLER_VERSION = "2.1.29"
 OPTIONS_PATH = Path(os.environ.get("SV_INSTALLER_OPTIONS", "/data/options.json"))
 STATE_PATH = Path(os.environ.get("SV_INSTALLER_STATE", "/data/state.json"))
 WORK_DIR = Path(os.environ.get("SV_INSTALLER_WORK", "/data/work"))
-BACKUP_DIR = Path(os.environ.get("SV_INSTALLER_BACKUPS", "/share/switch-vision-backups"))
+BACKUP_DIR = Path("/data/switch-vision-backups")
+SHARED_BACKUP_DIR = Path("/share/switch-vision-backups")
 LEGACY_BACKUP_DIR = Path("/share/switch_vision/installer_backups")
 HA_CONFIG = Path("/homeassistant")
 # Home Assistant Supervisor 2026.07 renamed the writable local app mapping
@@ -1344,10 +1345,10 @@ def validate_named_backup(name: str, progress: Progress | None = None) -> dict[s
 
 
 def _backup_roots() -> list[Path]:
-    roots = [BACKUP_DIR]
-    if LEGACY_BACKUP_DIR != BACKUP_DIR and LEGACY_BACKUP_DIR.is_dir():
-        roots.append(LEGACY_BACKUP_DIR)
-    return roots
+    # Only Installer-private /data backups are trusted for validation, restore,
+    # retention, and deletion. Historical shared backups are intentionally left
+    # untouched but are not a privileged restore source.
+    return [BACKUP_DIR]
 
 
 def list_backups() -> list[dict[str, Any]]:
