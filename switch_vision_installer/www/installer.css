@@ -6,9 +6,9 @@
   background:#07111f;
   color-scheme:dark;
   --sv-body:16px;
-  --sv-title:calc(var(--sv-body) * 1.83);
-  --sv-section:calc(var(--sv-body) * 1.2);
-  --sv-small:calc(var(--sv-body) * .86);
+  --sv-title:max(18px,1.83em);
+  --sv-section:max(14px,1.2em);
+  --sv-small:max(10px,.86em);
 }
 *{box-sizing:border-box}
 body{margin:0;background:radial-gradient(circle at top,#122a48 0,#07111f 48%,#040912 100%);min-height:100vh;font-size:var(--sv-body)}
