@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.1.31 — Move backup management into Switch Vision Maintenance
+
+- Add a Supervisor-mediated STDIN command bridge so Switch Vision Maintenance can manage Installer recovery backups without opening the privileged Installer HTTP API to other app containers.
+- Keep every recovery backup under the Installer-private `/data/switch-vision-backups` trust root; the Maintenance bridge returns only sanitized metadata and never backup paths, stored option payloads, credentials or file contents.
+- Add an Installer-owned automatic-retention policy with an on/off control and a strict retained-backup count of 1 through 10. Existing installations default to automatic retention and inherit their previous count, clamped safely into the new range.
+- Move the user-facing create, validate, restore, delete and retention controls out of the Installer page and into Switch Vision Maintenance while preserving the existing Installer backup/restore implementation and ingress source gate.
+- Add permanent regression coverage for policy bounds, disabled automatic pruning, manual retention, private metadata sanitization and strict command validation.
+
 ## v2.1.30 — Preserve restored SNMP2MQTT Home Assistant options
 
 - Stop deleting the SNMP2MQTT `homeassistant` saved option during repository setup now that SNMP2MQTT 0.9.18 restores it as a valid configuration section.
