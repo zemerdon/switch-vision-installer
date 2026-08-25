@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.1.32 — Explicit 10–20 px UI font sizing
+
+- Consume the Core 2.6.3 shared UI text-size contract as an explicit **10–20 px** body-font value.
+- Preserve upgrades from the legacy `normal`/`small` values by resolving them to 16 px / 14 px.
+- Apply the selected pixel size through one CSS variable so Installer titles, sections and small text scale consistently from the chosen body size.
+- Add permanent regression coverage for every accepted pixel size, legacy migration and invalid-value fallback.
+- No Installer backup trust-boundary, restore, release verification, component management or privacy behavior changes.
+
 ## v2.1.31 — Move backup management into Switch Vision Maintenance
 
 - Add a Supervisor-mediated STDIN command bridge so Switch Vision Maintenance can manage Installer recovery backups without opening the privileged Installer HTTP API to other app containers.

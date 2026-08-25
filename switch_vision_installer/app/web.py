@@ -13,12 +13,36 @@ from repository_setup import ensure_discovery_repository, ensure_snmp2mqtt_repos
 
 WEB_ROOT = Path(os.environ.get("SV_INSTALLER_WEB", "/opt/switch-vision-installer/www"))
 UI_PREFERENCES_PATH = Path(os.environ.get("SV_UI_PREFERENCES", "/share/switch_vision/ui-preferences.json"))
-UI_DEFAULTS = {"density": "comfortable", "text_size": "normal", "content_width": "standard"}
+UI_TEXT_SIZE_MIN_PX = 10
+UI_TEXT_SIZE_MAX_PX = 20
+UI_TEXT_SIZE_DEFAULT_PX = 16
+UI_TEXT_SIZE_LEGACY = {"normal": 16, "small": 14}
+UI_DEFAULTS = {"density": "comfortable", "text_size": UI_TEXT_SIZE_DEFAULT_PX, "content_width": "standard"}
 UI_ALLOWED = {
     "density": {"comfortable", "compact", "dense"},
-    "text_size": {"normal", "small"},
     "content_width": {"standard", "wide", "full"},
 }
+
+
+def normalise_ui_text_size(value) -> int:
+    if isinstance(value, bool):
+        return UI_TEXT_SIZE_DEFAULT_PX
+    if isinstance(value, str):
+        text = value.strip().lower()
+        if text in UI_TEXT_SIZE_LEGACY:
+            return UI_TEXT_SIZE_LEGACY[text]
+        if text.endswith("px"):
+            text = text[:-2].strip()
+        if not text.isdigit():
+            return UI_TEXT_SIZE_DEFAULT_PX
+        pixels = int(text)
+    elif isinstance(value, int):
+        pixels = value
+    else:
+        return UI_TEXT_SIZE_DEFAULT_PX
+    if UI_TEXT_SIZE_MIN_PX <= pixels <= UI_TEXT_SIZE_MAX_PX:
+        return pixels
+    return UI_TEXT_SIZE_DEFAULT_PX
 SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN", "")
 operation_lock = threading.Lock()
 operation = {"active": False, "kind": None, "message": "Ready.", "percent": 0, "result": None, "error": None}
@@ -42,6 +66,9 @@ def installer_ui_preferences() -> dict[str, str]:
                 candidate = str(installer.get(key, values[key])).strip().lower()
                 if candidate in allowed:
                     values[key] = candidate
+            values["text_size"] = normalise_ui_text_size(
+                installer.get("text_size", values["text_size"])
+            )
     except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         pass
     return values
