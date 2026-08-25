@@ -22,6 +22,9 @@ OPTIONS_PATH = Path(os.environ.get("SV_INSTALLER_OPTIONS", "/data/options.json")
 STATE_PATH = Path(os.environ.get("SV_INSTALLER_STATE", "/data/state.json"))
 WORK_DIR = Path(os.environ.get("SV_INSTALLER_WORK", "/data/work"))
 BACKUP_DIR = Path("/data/switch-vision-backups")
+BACKUP_POLICY_PATH = Path(
+    os.environ.get("SV_INSTALLER_BACKUP_POLICY", "/data/backup-policy.json")
+)
 SHARED_BACKUP_DIR = Path("/share/switch-vision-backups")
 LEGACY_BACKUP_DIR = Path("/share/switch_vision/installer_backups")
 HA_CONFIG = Path("/homeassistant")
@@ -1231,19 +1234,117 @@ def validate_backup(path: Path) -> dict[str, Any]:
     secure_backup_permissions(path)
     return {"ok": True, "file_count": len(expected), "manifest": manifest}
 
-def prune_backups() -> dict[str, Any]:
-    keep = max(1, int(load_options().get("backup_retention", 5)))
+def backup_policy() -> dict[str, Any]:
+    """Return the Installer-owned retention policy without exposing backups."""
+    if BACKUP_POLICY_PATH.exists():
+        if BACKUP_POLICY_PATH.is_symlink() or not BACKUP_POLICY_PATH.is_file():
+            raise RuntimeError("Installer backup policy is not a regular file.")
+        try:
+            document = json.loads(BACKUP_POLICY_PATH.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise RuntimeError(f"Installer backup policy is unreadable: {exc}") from exc
+        if (
+            not isinstance(document, dict)
+            or document.get("schema") != "switch-vision-installer-backup-policy-v1"
+        ):
+            raise RuntimeError("Installer backup policy has an unsupported schema.")
+        automatic = document.get("automatic_retention")
+        retention = document.get("retention_count")
+        if not isinstance(automatic, bool):
+            raise RuntimeError("Installer backup policy automatic_retention is invalid.")
+        if (
+            isinstance(retention, bool)
+            or not isinstance(retention, int)
+            or not 1 <= retention <= 10
+        ):
+            raise RuntimeError("Installer backup policy retention_count must be 1 through 10.")
+        return {
+            "automatic_retention": automatic,
+            "retention_count": retention,
+        }
+
+    # Pre-v2.1.31 retention was always automatic. Preserve the previous count
+    # as the first Maintenance default, clamped to the new 1-10 contract.
+    try:
+        legacy_retention = int(load_options().get("backup_retention", 5))
+    except (TypeError, ValueError):
+        legacy_retention = 5
+    return {
+        "automatic_retention": True,
+        "retention_count": max(1, min(10, legacy_retention)),
+    }
+
+
+def save_backup_policy(
+    automatic_retention: Any,
+    retention_count: Any,
+) -> dict[str, Any]:
+    if not isinstance(automatic_retention, bool):
+        raise ValueError("Automatic backup retention must be true or false.")
+    if (
+        isinstance(retention_count, bool)
+        or not isinstance(retention_count, int)
+        or not 1 <= retention_count <= 10
+    ):
+        raise ValueError("Retained backup count must be between 1 and 10.")
+
+    payload = {
+        "schema": "switch-vision-installer-backup-policy-v1",
+        "automatic_retention": automatic_retention,
+        "retention_count": retention_count,
+    }
+    BACKUP_POLICY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    temp = BACKUP_POLICY_PATH.parent / (
+        f".{BACKUP_POLICY_PATH.name}.{os.getpid()}.tmp"
+    )
+    try:
+        with temp.open("w", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        temp.chmod(0o600)
+        os.replace(temp, BACKUP_POLICY_PATH)
+    finally:
+        if temp.exists():
+            temp.unlink()
+    return {
+        "automatic_retention": automatic_retention,
+        "retention_count": retention_count,
+    }
+
+
+def prune_backups(*, force: bool = False) -> dict[str, Any]:
+    policy = backup_policy()
+    keep = int(policy["retention_count"])
     paths = sorted((p for p in BACKUP_DIR.iterdir() if p.is_dir()), reverse=True)
+    if not force and not policy["automatic_retention"]:
+        return {
+            "ok": True,
+            "automatic_retention": False,
+            "retention": keep,
+            "retention_skipped": True,
+            "removed": [],
+            "remaining": len(paths),
+        }
+
     removed: list[str] = []
     for old in paths[keep:]:
         removed.append(old.name)
         shutil.rmtree(old, ignore_errors=True)
-    return {"ok": True, "retention": keep, "removed": removed, "remaining": min(len(paths), keep)}
+    return {
+        "ok": True,
+        "automatic_retention": bool(policy["automatic_retention"]),
+        "retention": keep,
+        "retention_skipped": False,
+        "removed": removed,
+        "remaining": max(0, len(paths) - len(removed)),
+    }
 
 
 def apply_backup_retention() -> dict[str, Any]:
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    result = prune_backups()
+    result = prune_backups(force=True)
     result["backup_path"] = str(BACKUP_DIR)
     return result
 
@@ -2043,6 +2144,7 @@ def status() -> dict[str, Any]:
         "unifi2mqtt_webui": unifi.get("webui"),
         "unifi2mqtt_details_path": f"/config/app/{unifi.get('slug')}/info" if unifi.get("slug") else None,
         "backup_path": str(BACKUP_DIR),
-        "backup_retention": max(1, int(load_options().get("backup_retention", 5))),
+        "backup_retention": int(backup_policy()["retention_count"]),
+        "backup_retention_automatic": bool(backup_policy()["automatic_retention"]),
         "last_result": state,
     }

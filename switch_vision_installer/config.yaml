@@ -1,5 +1,5 @@
 name: Switch Vision Installer
-version: "2.1.30"
+version: "2.1.31"
 slug: switch_vision_installer
 description: Install and update every Switch Vision component from the official repositories.
 url: https://github.com/zemerdon/switch-vision-installer
@@ -12,6 +12,7 @@ init: false
 stage: stable
 ingress: true
 ingress_port: 8099
+stdin: true
 panel_icon: mdi:download-box-outline
 panel_title: Switch Vision Installer
 hassio_api: true
@@ -38,4 +39,4 @@ schema:
   preserve_custom_assets: bool
   create_backup: bool
   allow_prerelease: bool
-  backup_retention: int(1,20)
+  backup_retention: int(1,10)
