@@ -5,10 +5,10 @@
   color:#eaf2ff;
   background:#07111f;
   color-scheme:dark;
-  --sv-title:1.65rem;
-  --sv-section:1.08rem;
-  --sv-body:.9rem;
-  --sv-small:.78rem;
+  --sv-body:16px;
+  --sv-title:calc(var(--sv-body) * 1.83);
+  --sv-section:calc(var(--sv-body) * 1.2);
+  --sv-small:calc(var(--sv-body) * .86);
 }
 *{box-sizing:border-box}
 body{margin:0;background:radial-gradient(circle at top,#122a48 0,#07111f 48%,#040912 100%);min-height:100vh;font-size:var(--sv-body)}
@@ -91,13 +91,7 @@ select{background:#07101d;color:#eaf2ff;border:1px solid #294867;min-width:280px
   select{min-width:100%;width:100%}
 }
 
-/* Shared Switch Vision UI preferences. Defaults remain comfortable / normal / standard. */
-body.text-small{
-  --sv-title:1.5rem;
-  --sv-section:1rem;
-  --sv-body:.82rem;
-  --sv-small:.72rem;
-}
+/* Shared Switch Vision UI preferences. Body font size is supplied explicitly as 10-20 px. */
 body.width-wide main{max-width:1280px}
 body.width-full main{max-width:none;width:100%}
 

@@ -1,13 +1,16 @@
-const UI_DEFAULTS={density:'comfortable',text_size:'normal',content_width:'standard'};
-const UI_ALLOWED={density:new Set(['comfortable','compact','dense']),text_size:new Set(['normal','small']),content_width:new Set(['standard','wide','full'])};
+const UI_DEFAULTS={density:'comfortable',text_size:16,content_width:'standard'};
+const UI_ALLOWED={density:new Set(['comfortable','compact','dense']),content_width:new Set(['standard','wide','full'])};
+function normaliseUiTextSize(raw){const text=String(raw??'').trim().toLowerCase();if(text==='normal')return 16;if(text==='small')return 14;const value=Number.parseInt(text.endsWith('px')?text.slice(0,-2):text,10);return Number.isInteger(value)&&value>=10&&value<=20?value:16;}
 function applyUiPreferences(raw={}){
   const values={...UI_DEFAULTS};
-  for(const key of Object.keys(values)){
+  for(const key of ['density','content_width']){
     const candidate=String(raw?.[key]??values[key]).trim().toLowerCase();
     if(UI_ALLOWED[key].has(candidate))values[key]=candidate;
   }
+  values.text_size=normaliseUiTextSize(raw?.text_size);
   document.body.classList.remove('density-comfortable','density-compact','density-dense','text-normal','text-small','width-standard','width-wide','width-full');
-  document.body.classList.add(`density-${values.density}`,`text-${values.text_size}`,`width-${values.content_width}`);
+  document.body.classList.add(`density-${values.density}`,`width-${values.content_width}`);
+  document.body.style.setProperty('--sv-body',`${values.text_size}px`);
   return values;
 }
 async function loadUiPreferences(){

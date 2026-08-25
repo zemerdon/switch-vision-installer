@@ -34,4 +34,27 @@ assert "Restart Home Assistant Core required" in installer_js
 assert 'id="result-restart-core"' in installer_js
 assert "resultSummaryWithCoreRestart(op.result)" in installer_js
 
+# Explicit 10-20 px shared UI font contract, including legacy migration.
+import ast
+web_tree = ast.parse(web)
+helper = next(node for node in web_tree.body if isinstance(node, ast.FunctionDef) and node.name == 'normalise_ui_text_size')
+ns = {
+    'UI_TEXT_SIZE_MIN_PX': 10,
+    'UI_TEXT_SIZE_MAX_PX': 20,
+    'UI_TEXT_SIZE_DEFAULT_PX': 16,
+    'UI_TEXT_SIZE_LEGACY': {'normal': 16, 'small': 14},
+}
+exec(compile(ast.Module(body=[helper], type_ignores=[]), '<installer-ui-font>', 'exec'), ns)
+normalise = ns['normalise_ui_text_size']
+assert normalise('normal') == 16
+assert normalise('small') == 14
+for pixels in range(10, 21):
+    assert normalise(pixels) == pixels
+    assert normalise(str(pixels)) == pixels
+for invalid in (9, 21, 'giant', None, True, 14.5):
+    assert normalise(invalid) == 16
+assert "function normaliseUiTextSize(raw)" in installer_js
+assert "document.body.style.setProperty('--sv-body',`${values.text_size}px`)" in installer_js
+assert 'body.text-small{' not in (WWW / 'installer.css').read_text(encoding='utf-8')
+
 print(f"Installer UI/state regressions: PASS (v{config_version})")
