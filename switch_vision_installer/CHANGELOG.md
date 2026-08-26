@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.1.33 — Remove redundant readiness checklist
+
+- Remove the visible **Readiness checklist** card from the Installer UI; component/version state remains available in the existing Components, status and System actions areas.
+- Preserve all underlying readiness/status data and make the legacy checklist renderer safely no-op when the visual card is absent.
+- Keep install, update, reinstall, restart, backup, restore, Supervisor and privacy behavior unchanged.
+
 ## v2.1.32 — Explicit 10–20 px UI font sizing
 
 - Consume the Core 2.6.3 shared UI text-size contract as an explicit **10–20 px** body-font value.

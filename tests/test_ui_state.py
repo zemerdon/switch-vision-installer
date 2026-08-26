@@ -34,6 +34,14 @@ assert "Restart Home Assistant Core required" in installer_js
 assert 'id="result-restart-core"' in installer_js
 assert "resultSummaryWithCoreRestart(op.result)" in installer_js
 
+# v2.1.33: the visual readiness checklist is intentionally removed. The
+# underlying state data remains available to Installer logic; rendering simply
+# becomes a no-op when the old checklist element is absent.
+assert 'id="readiness-section"' not in index
+assert 'id="checklist"' not in index
+assert "const COLLAPSIBLE_SECTIONS=['activity-section','backups-section'];" in installer_js
+assert "function renderChecklist(){const target=$('checklist');if(!target)return;" in installer_js
+
 # Explicit 10-20 px shared UI font contract, including legacy migration.
 import ast
 web_tree = ast.parse(web)
