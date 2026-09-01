@@ -1,5 +1,5 @@
 name: Switch Vision Installer
-version: "2.1.33"
+version: "2.1.34"
 slug: switch_vision_installer
 description: Install and update every Switch Vision component from the official repositories.
 url: https://github.com/zemerdon/switch-vision-installer
@@ -16,6 +16,7 @@ stdin: true
 panel_icon: mdi:download-box-outline
 panel_title: Switch Vision Installer
 hassio_api: true
+homeassistant_api: true
 hassio_role: manager
 map:
   - type: homeassistant_config

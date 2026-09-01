@@ -103,6 +103,137 @@ def supervisor_request(path: str, method: str = "GET", payload: dict[str, Any] |
         suffix = f": {detail}" if detail else ""
         raise RuntimeError(f"Supervisor API {method} {path} failed with HTTP {exc.code}{suffix}") from exc
 
+
+def homeassistant_request(
+    path: str,
+    method: str = "GET",
+    payload: dict[str, Any] | None = None,
+) -> Any:
+    """Call Home Assistant through the Supervisor API proxy."""
+    clean = "/" + str(path or "").lstrip("/")
+    return supervisor_request(f"/core/api{clean}", method=method, payload=payload)
+
+
+def switch_vision_config_entry_status() -> dict[str, Any]:
+    """Return the current Switch Vision Home Assistant config-entry state."""
+    payload = homeassistant_request(
+        "/config/config_entries/entry?domain=switch_vision"
+    )
+    if isinstance(payload, list):
+        rows = payload
+    elif isinstance(payload, dict):
+        candidate = payload.get("data", payload)
+        rows = candidate if isinstance(candidate, list) else []
+    else:
+        rows = []
+    entries = [
+        row
+        for row in rows
+        if isinstance(row, dict)
+        and str(row.get("domain") or "").strip() == "switch_vision"
+    ]
+    entry = entries[0] if entries else {}
+    return {
+        "available": True,
+        "present": bool(entries),
+        "entry_id": str(entry.get("entry_id") or "") or None,
+        "state": str(entry.get("state") or "") or None,
+    }
+
+
+def _switch_vision_flow_handler_unavailable(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return "http 404" in text and "config_entries/flow" in text
+
+
+def ensure_switch_vision_config_entry() -> dict[str, Any]:
+    """Create the single Switch Vision config entry through HA's config flow."""
+    if not COMPONENT_DIR.is_dir():
+        return {
+            "present": False,
+            "created": False,
+            "restart_required": False,
+            "reason": "component_missing",
+        }
+
+    current = switch_vision_config_entry_status()
+    if current["present"]:
+        return {
+            **current,
+            "created": False,
+            "restart_required": False,
+        }
+
+    try:
+        start = homeassistant_request(
+            "/config/config_entries/flow",
+            method="POST",
+            payload={"handler": "switch_vision"},
+        )
+    except Exception as exc:
+        if _switch_vision_flow_handler_unavailable(exc):
+            return {
+                "present": False,
+                "created": False,
+                "restart_required": True,
+                "reason": "flow_handler_unavailable",
+            }
+        raise
+
+    if not isinstance(start, dict):
+        raise RuntimeError("Home Assistant returned an invalid Switch Vision config-flow response.")
+
+    flow_type = str(start.get("type") or "")
+    if flow_type == "abort":
+        reason = str(start.get("reason") or "")
+        if reason not in {"already_configured", "single_instance_allowed"}:
+            raise RuntimeError(f"Switch Vision config flow aborted unexpectedly: {reason or 'unknown'}")
+    elif flow_type == "form":
+        if str(start.get("step_id") or "") != "user":
+            raise RuntimeError(
+                "Switch Vision config flow returned an unexpected setup step: "
+                + str(start.get("step_id") or "unknown")
+            )
+        flow_id = str(start.get("flow_id") or "").strip()
+        if not flow_id:
+            raise RuntimeError("Switch Vision config flow did not return a flow_id.")
+        finish = homeassistant_request(
+            f"/config/config_entries/flow/{flow_id}",
+            method="POST",
+            payload={},
+        )
+        if not isinstance(finish, dict):
+            raise RuntimeError("Home Assistant returned an invalid Switch Vision config-flow completion.")
+        finish_type = str(finish.get("type") or "")
+        if finish_type == "abort":
+            reason = str(finish.get("reason") or "")
+            if reason not in {"already_configured", "single_instance_allowed"}:
+                raise RuntimeError(
+                    f"Switch Vision config flow aborted unexpectedly: {reason or 'unknown'}"
+                )
+        elif finish_type != "create_entry":
+            raise RuntimeError(
+                "Switch Vision config flow did not create the integration entry "
+                f"(result={finish_type or 'unknown'})."
+            )
+    elif flow_type != "create_entry":
+        raise RuntimeError(
+            "Switch Vision config flow returned an unexpected result: "
+            + (flow_type or "unknown")
+        )
+
+    verified = switch_vision_config_entry_status()
+    if not verified["present"]:
+        raise RuntimeError(
+            "Home Assistant accepted the Switch Vision config flow but no config entry is present."
+        )
+    return {
+        **verified,
+        "created": True,
+        "restart_required": False,
+    }
+
+
 def find_discovery_slug(include_store: bool = False) -> str:
     addon = _find_addon(
         lambda slug, name: (

@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.1.34 — Recover deleted Switch Vision integration entries
+
+- Detect whether the single Switch Vision Home Assistant config entry exists after install/reinstall and recreate a missing entry through Home Assistant's supported config-flow API.
+- Add the Home Assistant API permission required for the Installer to use that supported config-entry recovery path; never edit Home Assistant `.storage` config entries directly.
+- Extend the existing **Restart Home Assistant Core** action so the Installer waits for Core to return, then finishes and verifies Switch Vision integration registration automatically.
+- Keep an already-present Switch Vision config entry unchanged and fail safely to a restart-required state when newly installed Core files are not yet visible to Home Assistant's config-flow loader.
+- Add permanent regression coverage for existing-entry no-op, deleted-entry recreation, pre-restart handler unavailability, and post-restart recovery.
+
 ## v2.1.33 — Remove redundant readiness checklist
 
 - Remove the visible **Readiness checklist** card from the Installer UI; component/version state remains available in the existing Components, status and System actions areas.
