@@ -210,6 +210,28 @@ def install_switch_vision():
             + str(exc)
         )
 
+
+    try:
+        core_entry = installer_core.ensure_switch_vision_config_entry()
+        if core_entry.get("created"):
+            result.installed.append("Switch Vision integration entry")
+        elif core_entry.get("present"):
+            result.unchanged.append("Switch Vision integration entry")
+        elif core_entry.get("restart_required"):
+            if "Restart Home Assistant Core" not in result.required_actions:
+                result.required_actions.append("Restart Home Assistant Core")
+            result.warnings.append(
+                "Switch Vision Core files are installed, but Home Assistant has not "
+                "loaded the Switch Vision config-flow handler yet. Use the Installer's "
+                "Restart Home Assistant Core action; Installer 2.1.34 will finish and "
+                "verify integration registration after Core returns."
+            )
+    except Exception as exc:
+        result.warnings.append(
+            "Switch Vision files were installed, but the Home Assistant integration "
+            "entry could not be verified automatically: " + str(exc)
+        )
+
     result.warnings.extend(repository_warnings)
     installer_core.STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
     installer_core.STATE_PATH.write_text(
@@ -241,13 +263,30 @@ def supervisor_request(path: str, method: str = "POST") -> dict:
         return {"ok": True, "status": response.status, "message": text[:500]}
 
 
-def request_core_restart_async() -> None:
-    # Return the ingress response before Core restarts and interrupts the connection.
-    time.sleep(0.75)
-    try:
-        supervisor_request("/core/restart")
-    except Exception:
-        traceback.print_exc()
+def request_core_restart_async() -> dict:
+    """Restart Home Assistant Core and finish Switch Vision entry recovery."""
+    supervisor_request("/core/restart")
+    deadline = time.monotonic() + 180
+    last_error: Exception | None = None
+    while time.monotonic() < deadline:
+        time.sleep(2)
+        try:
+            recovery = installer_core.ensure_switch_vision_config_entry()
+        except Exception as exc:
+            last_error = exc
+            continue
+        if recovery.get("present"):
+            return {
+                "ok": True,
+                "core_restarted": True,
+                "config_entry": recovery,
+                "message": "Home Assistant Core restarted and Switch Vision integration registration is verified.",
+            }
+    detail = f" Last error: {last_error}" if last_error else ""
+    raise RuntimeError(
+        "Home Assistant Core restart was requested, but Switch Vision integration "
+        "registration could not be verified within 180 seconds." + detail
+    )
 
 
 class OperationBusyError(RuntimeError):
