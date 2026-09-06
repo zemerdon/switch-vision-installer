@@ -107,7 +107,6 @@ assert restart_result["config_entry"]["present"] is True
 assert restart_result["config_entry"]["entry_id"] == "after-restart"
 
 config = (ROOT / "switch_vision_installer" / "config.yaml").read_text(encoding="utf-8")
-assert 'version: "2.1.34"' in config
 assert "homeassistant_api: true" in config
 
 print("Switch Vision Installer v2.1.34 config-entry recovery regression: PASS")

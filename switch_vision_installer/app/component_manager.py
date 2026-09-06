@@ -73,6 +73,8 @@ COMPONENTS: tuple[ComponentSpec, ...] = (
 
 _CACHE: dict[str, tuple[float, Any]] = {}
 CACHE_SECONDS = 45
+_PUBLIC_RELEASE_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
+PUBLIC_RELEASE_CACHE_SECONDS = 600
 
 
 def _cached(key: str, loader):
@@ -87,6 +89,7 @@ def _cached(key: str, loader):
 
 def clear_cache() -> None:
     _CACHE.clear()
+    _PUBLIC_RELEASE_CACHE.clear()
 
 
 def _github_request(url: str) -> Any:
@@ -161,6 +164,49 @@ def _remote_version(spec: ComponentSpec) -> str:
     if not spec.config_path:
         return ""
     return _yaml_version(_raw_text(repository, spec.config_path))
+
+
+def _public_release_metadata(spec: ComponentSpec) -> dict[str, Any]:
+    """Return authoritative public GitHub Release metadata for one component.
+
+    This metadata is presentation-only. Existing ``latest_version`` resolution
+    remains authoritative for install/update decisions, so an unreleased main
+    branch version can never inherit the timestamp of an older public release.
+    """
+    repository = resolve_repository(spec)
+    now = time.monotonic()
+    cached = _PUBLIC_RELEASE_CACHE.get(repository)
+    if cached and now - cached[0] < PUBLIC_RELEASE_CACHE_SECONDS:
+        return dict(cached[1])
+
+    try:
+        payload = _github_request(
+            f"https://api.github.com/repos/zemerdon/{repository}/releases/latest"
+        )
+        if not isinstance(payload, dict):
+            raise RuntimeError("GitHub release metadata returned an unexpected response")
+        tag = str(payload.get("tag_name") or "").strip()
+        version = installer_core.normalise_version(tag)
+        published_at = str(payload.get("published_at") or "").strip() or None
+        release_url = str(payload.get("html_url") or "").strip() or None
+        result = {
+            "public_release_version": version or None,
+            "public_release_published_at": published_at,
+            "public_release_url": release_url,
+            "release_metadata_error": None,
+        }
+    except Exception as exc:
+        result = {
+            "public_release_version": None,
+            "public_release_published_at": None,
+            "public_release_url": None,
+            "release_metadata_error": (
+                f"{type(exc).__name__}: release metadata unavailable"
+            ),
+        }
+
+    _PUBLIC_RELEASE_CACHE[repository] = (now, dict(result))
+    return dict(result)
 
 
 def _installed_addon_status(component_id: str) -> dict[str, Any]:
@@ -320,6 +366,17 @@ def component_status() -> dict[str, Any]:
         "update_order": ["core", "discovery", "snmp2mqtt", "unifi2mqtt"],
         "installer_update_external": True,
     }
+
+
+def component_status_with_releases() -> dict[str, Any]:
+    """Enrich the live component snapshot with presentation-only release data."""
+    snapshot = component_status()
+    by_id = {spec.component_id: spec for spec in COMPONENTS}
+    for row in snapshot["components"]:
+        spec = by_id.get(str(row.get("id") or ""))
+        if spec is not None:
+            row.update(_public_release_metadata(spec))
+    return snapshot
 
 
 def component_changelog(component_id: str) -> dict[str, Any]:

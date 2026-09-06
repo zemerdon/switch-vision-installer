@@ -123,3 +123,84 @@ assert result["installed"] == []
 assert any("Home Assistant Settings" in item for item in result["required_actions"])
 
 print("installer self-update safety regression: PASS")
+
+# Installer v2.1.35 authoritative public release metadata is independent of the
+# existing main/config-driven latest-version contract used for update decisions.
+module.clear_cache()
+release_calls = []
+module.resolve_repository = lambda spec: spec.repositories[0]
+def github_release(url):
+    release_calls.append(url)
+    assert url == (
+        "https://api.github.com/repos/zemerdon/"
+        "switch-vision-releases/releases/latest"
+    )
+    return {
+        "tag_name": "v9.8.7",
+        "published_at": "2026-09-06T12:34:56Z",
+        "html_url": "https://github.com/zemerdon/switch-vision-releases/releases/tag/v9.8.7",
+    }
+module._github_request = github_release
+public = module._public_release_metadata(core)
+assert public["public_release_version"] == "9.8.7"
+assert public["public_release_published_at"] == "2026-09-06T12:34:56Z"
+assert public["public_release_url"].endswith("/releases/tag/v9.8.7")
+assert public["release_metadata_error"] is None
+assert module._public_release_metadata(core) == public
+assert len(release_calls) == 1
+
+module.clear_cache()
+def unavailable_release(_url):
+    raise OSError("offline")
+module._github_request = unavailable_release
+unavailable = module._public_release_metadata(core)
+assert unavailable["public_release_version"] is None
+assert unavailable["public_release_published_at"] is None
+assert unavailable["public_release_url"] is None
+assert unavailable["release_metadata_error"].startswith("OSError:")
+
+# The enrichment pass must iterate the live COMPONENTS catalog; no second
+# component list is permitted.
+release_components = []
+base_snapshot = module.component_status()
+def base_status():
+    return {
+        **base_snapshot,
+        "components": [dict(row) for row in base_snapshot["components"]],
+    }
+module.component_status = base_status
+def public_release_stub(spec):
+    release_components.append(spec.component_id)
+    return {
+        "public_release_version": "9.9.9",
+        "public_release_published_at": "2026-09-06T12:34:56Z",
+        "public_release_url": f"https://example.invalid/{spec.component_id}",
+        "release_metadata_error": None,
+    }
+module._public_release_metadata = public_release_stub
+enriched = module.component_status_with_releases()
+assert release_components == order
+assert [row["id"] for row in enriched["components"]] == order
+assert all(row["public_release_version"] == "9.9.9" for row in enriched["components"])
+assert all(
+    row["public_release_published_at"] == "2026-09-06T12:34:56Z"
+    for row in enriched["components"]
+)
+assert [
+    row["latest_version"] for row in enriched["components"]
+] == [
+    row["latest_version"] for row in base_snapshot["components"]
+]
+
+ui = (ROOT / "switch_vision_installer" / "www" / "component-manager.js").read_text(
+    encoding="utf-8"
+)
+assert "public_release_version" in ui
+assert "public_release_published_at" in ui
+assert "new Intl.DateTimeFormat" in ui
+assert "Release time unavailable" in ui
+assert "lastModified" not in ui
+
+manager = (APP / "web_manager.py").read_text(encoding="utf-8")
+assert "component_status_with_releases()" in manager
+print("Installer v2.1.35 public release presentation regression: PASS")
