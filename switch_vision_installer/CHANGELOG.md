@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.1.35 — Authoritative component release publication times
+
+- Show the latest public GitHub Release version and publication date/time on every Installer component card using the release API's authoritative `published_at` value.
+- Keep the existing installed → latest version line and all update/dependency decisions unchanged; public-release metadata is presentation-only and is never substituted for an unreleased main/config version.
+- Derive release metadata from the live `COMPONENTS` catalog instead of maintaining a second hard-coded component list, with a clear unavailable fallback when GitHub release metadata cannot be fetched.
+- Cache public-release metadata separately to reduce GitHub API traffic and never infer publication time from local file modification timestamps.
+- Add permanent regressions for authoritative metadata parsing, cache/failure behavior, live-catalog coverage, status/version separation, and frontend timestamp rendering.
+
 ## v2.1.34 — Recover deleted Switch Vision integration entries
 
 - Detect whether the single Switch Vision Home Assistant config entry exists after install/reinstall and recreate a missing entry through Home Assistant's supported config-flow API.

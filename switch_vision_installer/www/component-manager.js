@@ -15,6 +15,21 @@ function componentVersionText(row){
   return `${installed} → ${latest}`;
 }
 
+function publicReleaseTime(value){
+  if(!value)return'';
+  const date=new Date(value);
+  if(Number.isNaN(date.getTime()))return'';
+  return new Intl.DateTimeFormat(undefined,{dateStyle:'medium',timeStyle:'short'}).format(date);
+}
+
+function componentPublicReleaseText(row){
+  const version=row.public_release_version?`v${row.public_release_version}`:'version unavailable';
+  const stamp=publicReleaseTime(row.public_release_published_at);
+  return stamp
+    ?`Latest public ${version} · Released ${stamp}`
+    :`Latest public ${version} · Release time unavailable`;
+}
+
 function managedComponentAction(row){
   if(row.id==='installer'&&row.update_available)return'Update in Home Assistant';
   if(!row.installed&&!row.optional)return'Install';
@@ -35,6 +50,7 @@ function renderManagedComponents(){
       <div class="managed-component-main">
         <div class="managed-component-title">${esc(row.label)}</div>
         <div class="managed-component-version">${esc(componentVersionText(row))}</div>
+        <div class="managed-component-release">${esc(componentPublicReleaseText(row))}</div>
         ${dependency}
       </div>
       <strong class="managed-component-state ${cls}">${esc(status)}</strong>
