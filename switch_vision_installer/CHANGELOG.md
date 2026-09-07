@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.1.36 — Component metadata follows publication authority
+
+- Show Core and UniFi2MQTT metadata from their public GitHub Releases only.
+- Resolve Discovery and SNMP2MQTT metadata from their public GHCR OCI image tags, reporting the image build timestamp rather than attempting a GitHub Release lookup.
+- Identify Installer as repository-current/App Store managed, using its current source version and commit timestamp instead of presenting the historical v1.9.7 GitHub Release as current.
+- Keep component update decisions unchanged and add permanent regression coverage for all three publication-authority paths.
+
 ## v2.1.35 — Authoritative component release publication times
 
 - Show the latest public GitHub Release version and publication date/time on every Installer component card using the release API's authoritative `published_at` value.

@@ -6,6 +6,7 @@ import json
 import re
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 import installer as installer_core
@@ -24,6 +25,8 @@ class ComponentSpec:
     changelog_path: str | None = None
     optional: bool = False
     min_core: str | None = None
+    publication_authority: str = "github_release"
+    oci_image: str | None = None
 
 
 # These are the permanent public repository identities used by Switch Vision.
@@ -43,6 +46,8 @@ COMPONENTS: tuple[ComponentSpec, ...] = (
         "switch_vision_discovery/config.yaml",
         "switch_vision_discovery/CHANGELOG.md",
         min_core="2.3.10",
+        publication_authority="oci_image",
+        oci_image="zemerdon/switch-vision-discovery",
     ),
     ComponentSpec(
         "snmp2mqtt",
@@ -51,6 +56,8 @@ COMPONENTS: tuple[ComponentSpec, ...] = (
         ("switch-vision-snmp2mqtt-addon",),
         "switch-vision-snmp2mqtt/config.yaml",
         "switch-vision-snmp2mqtt/CHANGELOG.md",
+        publication_authority="oci_image",
+        oci_image="zemerdon/switch-vision-snmp2mqtt-addon",
     ),
     ComponentSpec(
         "unifi2mqtt",
@@ -68,6 +75,7 @@ COMPONENTS: tuple[ComponentSpec, ...] = (
         ("switch-vision-installer",),
         "switch_vision_installer/config.yaml",
         "switch_vision_installer/CHANGELOG.md",
+        publication_authority="repository_current",
     ),
 )
 
@@ -102,6 +110,73 @@ def _github_request(url: str) -> Any:
     )
     with urllib.request.urlopen(request, timeout=20) as response:
         return json.load(response)
+
+
+OCI_INDEX_ACCEPT = (
+    "application/vnd.oci.image.index.v1+json, "
+    "application/vnd.docker.distribution.manifest.list.v2+json, "
+    "application/vnd.oci.image.manifest.v1+json, "
+    "application/vnd.docker.distribution.manifest.v2+json"
+)
+OCI_MANIFEST_ACCEPT = (
+    "application/vnd.oci.image.manifest.v1+json, "
+    "application/vnd.docker.distribution.manifest.v2+json"
+)
+
+
+def _oci_token(image: str) -> str:
+    query = urllib.parse.urlencode({
+        "service": "ghcr.io",
+        "scope": f"repository:{image}:pull",
+    })
+    payload = _json_request(f"https://ghcr.io/token?{query}")
+    token = str(payload.get("token") or payload.get("access_token") or "").strip()
+    if not token:
+        raise RuntimeError("GHCR did not return a public pull token")
+    return token
+
+
+def _json_request(url: str, headers: dict[str, str] | None = None) -> Any:
+    request_headers = {
+        "User-Agent": f"Switch-Vision-Installer/{installer_core.INSTALLER_VERSION}",
+        **(headers or {}),
+    }
+    request = urllib.request.Request(url, headers=request_headers)
+    with urllib.request.urlopen(request, timeout=20) as response:
+        return json.load(response)
+
+
+def _oci_request(image: str, path: str, token: str, accept: str | None = None) -> Any:
+    headers = {"Authorization": f"Bearer {token}"}
+    if accept:
+        headers["Accept"] = accept
+    return _json_request(f"https://ghcr.io/v2/{image}/{path.lstrip('/')}", headers)
+
+
+def _oci_amd64_manifest(image: str, version: str, token: str) -> dict[str, Any]:
+    index = _oci_request(image, f"manifests/{version}", token, OCI_INDEX_ACCEPT)
+    if not isinstance(index, dict):
+        raise RuntimeError("OCI image metadata returned an unexpected manifest")
+    manifests = index.get("manifests")
+    if not isinstance(manifests, list):
+        return index
+    descriptor = next(
+        (
+            item for item in manifests
+            if isinstance(item, dict)
+            and isinstance(item.get("platform"), dict)
+            and item["platform"].get("os") == "linux"
+            and item["platform"].get("architecture") == "amd64"
+        ),
+        None,
+    )
+    digest = str((descriptor or {}).get("digest") or "").strip()
+    if not digest:
+        raise RuntimeError("OCI image index has no linux/amd64 manifest")
+    manifest = _oci_request(image, f"manifests/{digest}", token, OCI_MANIFEST_ACCEPT)
+    if not isinstance(manifest, dict):
+        raise RuntimeError("OCI child manifest returned an unexpected response")
+    return manifest
 
 
 def _raw_text(repository: str, path: str) -> str:
@@ -166,46 +241,112 @@ def _remote_version(spec: ComponentSpec) -> str:
     return _yaml_version(_raw_text(repository, spec.config_path))
 
 
-def _public_release_metadata(spec: ComponentSpec) -> dict[str, Any]:
-    """Return authoritative public GitHub Release metadata for one component.
+def _github_release_metadata(repository: str) -> dict[str, Any]:
+    payload = _github_request(
+        f"https://api.github.com/repos/zemerdon/{repository}/releases/latest"
+    )
+    if not isinstance(payload, dict):
+        raise RuntimeError("GitHub release metadata returned an unexpected response")
+    tag = str(payload.get("tag_name") or "").strip()
+    return {
+        "public_release_version": installer_core.normalise_version(tag) or None,
+        "public_release_published_at": str(payload.get("published_at") or "").strip() or None,
+        "public_release_url": str(payload.get("html_url") or "").strip() or None,
+        "public_release_kind": "github_release",
+    }
 
-    This metadata is presentation-only. Existing ``latest_version`` resolution
-    remains authoritative for install/update decisions, so an unreleased main
-    branch version can never inherit the timestamp of an older public release.
+
+def _oci_image_metadata(spec: ComponentSpec, version: str) -> dict[str, Any]:
+    image = str(spec.oci_image or "").strip()
+    if not image:
+        raise RuntimeError("OCI image authority is missing its image name")
+    token = _oci_token(image)
+    manifest = _oci_amd64_manifest(image, version, token)
+    config_digest = str(manifest.get("config", {}).get("digest") or "").strip()
+    if not config_digest:
+        raise RuntimeError("OCI manifest has no image configuration digest")
+    config = _oci_request(image, f"blobs/{config_digest}", token)
+    if not isinstance(config, dict):
+        raise RuntimeError("OCI image configuration returned an unexpected response")
+    config_section = config.get("config")
+    labels = config_section.get("Labels") if isinstance(config_section, dict) else None
+    if not isinstance(labels, dict):
+        labels = {}
+    created = str(
+        labels.get("org.opencontainers.image.created") or config.get("created") or ""
+    ).strip()
+    if not created:
+        raise RuntimeError("OCI image configuration has no build timestamp")
+    return {
+        "public_release_version": version,
+        "public_release_published_at": created,
+        "public_release_url": (
+            f"https://github.com/zemerdon/{resolve_repository(spec)}"
+            f"/pkgs/container/{image.rsplit('/', 1)[-1]}"
+        ),
+        "public_release_kind": "oci_image",
+    }
+
+
+def _repository_current_metadata(spec: ComponentSpec, repository: str) -> dict[str, Any]:
+    payload = _github_request(
+        f"https://api.github.com/repos/zemerdon/{repository}/commits/main"
+    )
+    if not isinstance(payload, dict):
+        raise RuntimeError("repository current metadata returned an unexpected response")
+    committed_at = str(payload.get("commit", {}).get("committer", {}).get("date") or "").strip()
+    if not committed_at:
+        raise RuntimeError("repository current metadata has no commit timestamp")
+    version = _remote_version(spec)
+    if not version:
+        raise RuntimeError("repository current metadata has no current version")
+    return {
+        "public_release_version": version,
+        "public_release_published_at": committed_at,
+        "public_release_url": str(payload.get("html_url") or "").strip() or repository_url(spec),
+        "public_release_kind": "repository_current",
+    }
+
+
+def _public_release_metadata(spec: ComponentSpec) -> dict[str, Any]:
+    """Return presentation metadata from the component's actual authority.
+
+    Version resolution remains authoritative for install/update decisions. This
+    display-only path never lets an old GitHub Release stand in for an OCI app
+    image or the Installer's repository-managed App Store source.
     """
     repository = resolve_repository(spec)
     now = time.monotonic()
-    cached = _PUBLIC_RELEASE_CACHE.get(repository)
+    cache_key = f"{spec.publication_authority}:{repository}"
+    cached = _PUBLIC_RELEASE_CACHE.get(cache_key)
     if cached and now - cached[0] < PUBLIC_RELEASE_CACHE_SECONDS:
         return dict(cached[1])
 
     try:
-        payload = _github_request(
-            f"https://api.github.com/repos/zemerdon/{repository}/releases/latest"
-        )
-        if not isinstance(payload, dict):
-            raise RuntimeError("GitHub release metadata returned an unexpected response")
-        tag = str(payload.get("tag_name") or "").strip()
-        version = installer_core.normalise_version(tag)
-        published_at = str(payload.get("published_at") or "").strip() or None
-        release_url = str(payload.get("html_url") or "").strip() or None
-        result = {
-            "public_release_version": version or None,
-            "public_release_published_at": published_at,
-            "public_release_url": release_url,
-            "release_metadata_error": None,
-        }
+        if spec.publication_authority == "github_release":
+            result = _github_release_metadata(repository)
+        elif spec.publication_authority == "oci_image":
+            version = _remote_version(spec)
+            if not version:
+                raise RuntimeError("OCI image source has no current semantic version")
+            result = _oci_image_metadata(spec, version)
+        elif spec.publication_authority == "repository_current":
+            result = _repository_current_metadata(spec, repository)
+        else:
+            raise RuntimeError(f"unknown publication authority: {spec.publication_authority}")
+        result["release_metadata_error"] = None
     except Exception as exc:
         result = {
             "public_release_version": None,
             "public_release_published_at": None,
             "public_release_url": None,
+            "public_release_kind": spec.publication_authority,
             "release_metadata_error": (
                 f"{type(exc).__name__}: release metadata unavailable"
             ),
         }
 
-    _PUBLIC_RELEASE_CACHE[repository] = (now, dict(result))
+    _PUBLIC_RELEASE_CACHE[cache_key] = (now, dict(result))
     return dict(result)
 
 
@@ -661,4 +802,3 @@ def update_all(progress: Progress | None = None) -> dict[str, Any]:
         "component_update": "all",
         "completed_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
-

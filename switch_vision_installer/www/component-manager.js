@@ -25,6 +25,16 @@ function publicReleaseTime(value){
 function componentPublicReleaseText(row){
   const version=row.public_release_version?`v${row.public_release_version}`:'version unavailable';
   const stamp=publicReleaseTime(row.public_release_published_at);
+  if(row.public_release_kind==='oci_image'){
+    return stamp
+      ?`Public OCI image ${version} · Built ${stamp}`
+      :`Public OCI image ${version} · Build time unavailable`;
+  }
+  if(row.public_release_kind==='repository_current'){
+    return stamp
+      ?`Repository current ${version} · Updated ${stamp}`
+      :`Repository current ${version} · Update time unavailable`;
+  }
   return stamp
     ?`Latest public ${version} · Released ${stamp}`
     :`Latest public ${version} · Release time unavailable`;
