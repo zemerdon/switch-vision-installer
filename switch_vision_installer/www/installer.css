@@ -92,8 +92,29 @@ select{background:#07101d;color:#eaf2ff;border:1px solid #294867;min-width:280px
 }
 
 /* Shared Switch Vision UI preferences. Body font size is supplied explicitly as 10-20 px. */
+body.width-standard main{max-width:1040px}
+body.width-standard_plus main{max-width:1140px}
 body.width-wide main{max-width:1280px}
+body.width-wide_plus main{max-width:1400px}
+body.width-extra_wide main{max-width:1520px}
+body.width-extra_wide_plus main{max-width:1640px}
+body.width-ultra_wide main{max-width:1760px}
+body.width-ultra_wide_plus main{max-width:1880px}
+body.width-max_wide main{max-width:2000px}
 body.width-full main{max-width:none;width:100%}
+
+body.density-spacious main{padding:30px 22px 54px}
+body.density-spacious header{gap:18px;margin-bottom:18px}
+body.density-spacious .mark{width:54px;height:54px;border-radius:16px;font-size:1.35rem}
+body.density-spacious .grid{gap:14px}
+body.density-spacious .grid article,body.density-spacious .card{border-radius:14px;padding:16px 18px}
+body.density-spacious .card{margin-top:14px}
+body.density-spacious .components{gap:8px}
+body.density-spacious .component{padding:9px 12px}
+body.density-spacious .details{gap:10px}
+body.density-spacious .details>div{padding:10px 12px}
+body.density-spacious .actions,body.density-spacious .restore-row{gap:10px}
+body.density-spacious button,body.density-spacious select{padding:10px 14px}
 
 body.density-compact main{padding:14px 10px 28px}
 body.density-compact header{gap:10px;margin-bottom:10px}
@@ -154,16 +175,41 @@ body.density-dense .backup-policy span{padding:3px 6px}
 body.density-dense .checklist{gap:4px}
 body.density-dense .check-item{gap:4px;padding:5px 6px;border-radius:6px}
 
+body.density-ultra_dense main{padding:4px 4px 12px}
+body.density-ultra_dense header{gap:5px;margin-bottom:4px}
+body.density-ultra_dense header p{margin-top:0}
+body.density-ultra_dense .mark{width:30px;height:30px;border-radius:8px;font-size:.9rem}
+body.density-ultra_dense h2{margin-bottom:3px}
+body.density-ultra_dense h3{margin-bottom:2px}
+body.density-ultra_dense p{margin:3px 0 4px;line-height:1.2}
+body.density-ultra_dense .grid{gap:3px}
+body.density-ultra_dense .grid article,body.density-ultra_dense .card{border-radius:6px;padding:4px 5px;box-shadow:0 4px 12px #0003}
+body.density-ultra_dense .card{margin-top:3px}
+body.density-ultra_dense .components{gap:2px}
+body.density-ultra_dense .component{gap:6px;padding:3px 5px;border-radius:5px}
+body.density-ultra_dense .details{gap:3px}
+body.density-ultra_dense .details>div{padding:3px 5px;border-radius:5px}
+body.density-ultra_dense .actions,body.density-ultra_dense .restore-row{gap:3px}
+body.density-ultra_dense button,body.density-ultra_dense select{border-radius:5px;padding:5px 7px}
+body.density-ultra_dense .checklist{gap:3px}
+body.density-ultra_dense .check-item{gap:3px;padding:4px 5px;border-radius:5px}
+
 @media(max-width:720px){
-  body.width-wide main,body.width-full main{max-width:none;width:100%}
+  body.width-standard main,body.width-standard_plus main,body.width-wide main,body.width-wide_plus main,body.width-extra_wide main,body.width-extra_wide_plus main,body.width-ultra_wide main,body.width-ultra_wide_plus main,body.width-max_wide main,body.width-full main{max-width:none;width:100%}
+  body.density-spacious main{padding:20px 14px 34px}
   body.density-compact main{padding:12px 8px 24px}
   body.density-dense main{padding:8px 6px 18px}
+  body.density-ultra_dense main{padding:4px 4px 12px}
 }
 
 body.density-compact .collapsible-card>summary{padding:9px 10px}
 body.density-compact .collapsible-content{padding:0 10px 9px}
 body.density-dense .collapsible-card>summary{padding:6px 7px}
 body.density-dense .collapsible-content{padding:0 7px 6px}
+body.density-spacious .collapsible-card>summary{padding:14px 16px}
+body.density-spacious .collapsible-content{padding:0 16px 14px}
+body.density-ultra_dense .collapsible-card>summary{padding:4px 5px}
+body.density-ultra_dense .collapsible-content{padding:0 5px 4px}
 
 .config-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:10px 0}
 .config-grid label{display:flex;flex-direction:column;gap:5px;color:#aabbd0;font-size:var(--sv-small)}

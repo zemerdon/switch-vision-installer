@@ -1,5 +1,5 @@
 const UI_DEFAULTS={density:'comfortable',text_size:16,content_width:'standard'};
-const UI_ALLOWED={density:new Set(['comfortable','compact','dense']),content_width:new Set(['standard','wide','full'])};
+const UI_ALLOWED={density:new Set(['spacious','comfortable','compact','dense','ultra_dense']),content_width:new Set(['standard','standard_plus','wide','wide_plus','extra_wide','extra_wide_plus','ultra_wide','ultra_wide_plus','max_wide','full'])};
 function normaliseUiTextSize(raw){const text=String(raw??'').trim().toLowerCase();if(text==='normal')return 16;if(text==='small')return 14;const value=Number.parseInt(text.endsWith('px')?text.slice(0,-2):text,10);return Number.isInteger(value)&&value>=10&&value<=20?value:16;}
 function applyUiPreferences(raw={}){
   const values={...UI_DEFAULTS};
@@ -8,7 +8,7 @@ function applyUiPreferences(raw={}){
     if(UI_ALLOWED[key].has(candidate))values[key]=candidate;
   }
   values.text_size=normaliseUiTextSize(raw?.text_size);
-  document.body.classList.remove('density-comfortable','density-compact','density-dense','text-normal','text-small','width-standard','width-wide','width-full');
+  document.body.classList.remove('density-spacious','density-comfortable','density-compact','density-dense','density-ultra_dense','text-normal','text-small','width-standard','width-standard_plus','width-wide','width-wide_plus','width-extra_wide','width-extra_wide_plus','width-ultra_wide','width-ultra_wide_plus','width-max_wide','width-full');
   document.body.classList.add(`density-${values.density}`,`width-${values.content_width}`);
   document.body.style.setProperty('--sv-body',`${values.text_size}px`);
   return values;
