@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.1.37 — Five-step density and ten-step width rendering
+
+- Consume the expanded Core management appearance contract with **five UI density positions** from Spacious through Ultra Dense and **ten content-width positions** from Standard through Full.
+- Give every width position a distinct Installer maximum width and every density position distinct spacing/control/card geometry, while preserving the existing Standard, Wide, Full, Comfortable, Compact, and Dense values for upgrade compatibility.
+- Keep mobile layouts full-width and retain the existing explicit 10–20 px text-size contract independently of width/density.
+- Add permanent Installer regression coverage for the complete 5×10 presentation scale; install/update/backup/recovery behavior is unchanged.
+
 ## v2.1.36 — Component metadata follows publication authority
 
 - Show Core and UniFi2MQTT metadata from their public GitHub Releases only.

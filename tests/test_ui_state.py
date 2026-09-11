@@ -65,4 +65,17 @@ assert "function normaliseUiTextSize(raw)" in installer_js
 assert "document.body.style.setProperty('--sv-body',`${values.text_size}px`)" in installer_js
 assert 'body.text-small{' not in (WWW / 'installer.css').read_text(encoding='utf-8')
 
+
+# Shared 5-point density and 10-point width contract consumed from Core.
+for marker in (
+    "density:new Set(['spacious','comfortable','compact','dense','ultra_dense'])",
+    "content_width:new Set(['standard','standard_plus','wide','wide_plus','extra_wide','extra_wide_plus','ultra_wide','ultra_wide_plus','max_wide','full'])",
+    'body.width-standard_plus main{max-width:1140px}',
+    'body.width-extra_wide main{max-width:1520px}',
+    'body.width-max_wide main{max-width:2000px}',
+    'body.density-spacious main{padding:30px 22px 54px}',
+    'body.density-ultra_dense main{padding:4px 4px 12px}',
+):
+    assert marker in installer_js or marker in (WWW / 'installer.css').read_text(encoding='utf-8') or marker in web, marker
+
 print(f"Installer UI/state regressions: PASS (v{config_version})")

@@ -19,8 +19,11 @@ UI_TEXT_SIZE_DEFAULT_PX = 16
 UI_TEXT_SIZE_LEGACY = {"normal": 16, "small": 14}
 UI_DEFAULTS = {"density": "comfortable", "text_size": UI_TEXT_SIZE_DEFAULT_PX, "content_width": "standard"}
 UI_ALLOWED = {
-    "density": {"comfortable", "compact", "dense"},
-    "content_width": {"standard", "wide", "full"},
+    "density": {"spacious", "comfortable", "compact", "dense", "ultra_dense"},
+    "content_width": {
+        "standard", "standard_plus", "wide", "wide_plus", "extra_wide",
+        "extra_wide_plus", "ultra_wide", "ultra_wide_plus", "max_wide", "full",
+    },
 }
 
 
