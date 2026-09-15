@@ -92,15 +92,15 @@ select{background:#07101d;color:#eaf2ff;border:1px solid #294867;min-width:280px
 }
 
 /* Shared Switch Vision UI preferences. Body font size is supplied explicitly as 10-20 px. */
-body.width-standard main{max-width:1040px}
-body.width-standard_plus main{max-width:1140px}
-body.width-wide main{max-width:1280px}
-body.width-wide_plus main{max-width:1400px}
-body.width-extra_wide main{max-width:1520px}
-body.width-extra_wide_plus main{max-width:1640px}
-body.width-ultra_wide main{max-width:1760px}
-body.width-ultra_wide_plus main{max-width:1880px}
-body.width-max_wide main{max-width:2000px}
+body.width-standard main{max-width:none;width:64%}
+body.width-standard_plus main{max-width:none;width:68%}
+body.width-wide main{max-width:none;width:72%}
+body.width-wide_plus main{max-width:none;width:76%}
+body.width-extra_wide main{max-width:none;width:80%}
+body.width-extra_wide_plus main{max-width:none;width:84%}
+body.width-ultra_wide main{max-width:none;width:88%}
+body.width-ultra_wide_plus main{max-width:none;width:92%}
+body.width-max_wide main{max-width:none;width:96%}
 body.width-full main{max-width:none;width:100%}
 
 body.density-spacious main{padding:30px 22px 54px}
