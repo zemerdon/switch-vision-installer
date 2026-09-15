@@ -67,12 +67,29 @@ assert 'body.text-small{' not in (WWW / 'installer.css').read_text(encoding='utf
 
 
 # Shared 5-point density and 10-point width contract consumed from Core.
+css = (WWW / 'installer.css').read_text(encoding='utf-8')
+width_steps = [
+    ('standard', 64), ('standard_plus', 68), ('wide', 72), ('wide_plus', 76),
+    ('extra_wide', 80), ('extra_wide_plus', 84), ('ultra_wide', 88),
+    ('ultra_wide_plus', 92), ('max_wide', 96), ('full', 100),
+]
+for name, pct in width_steps:
+    assert f'body.width-{name} main{{max-width:none;width:{pct}%}}' in css
+assert [pct for _, pct in width_steps] == list(range(64, 101, 4))
+assert sum(pct == 100 for _, pct in width_steps) == 1
+for name, legacy in (
+    ('standard', 1040), ('standard_plus', 1140), ('wide', 1280),
+    ('wide_plus', 1400), ('extra_wide', 1520), ('extra_wide_plus', 1640),
+    ('ultra_wide', 1760), ('ultra_wide_plus', 1880), ('max_wide', 2000),
+):
+    assert f'body.width-{name} main{{max-width:{legacy}px}}' not in css
+
 for marker in (
     "density:new Set(['spacious','comfortable','compact','dense','ultra_dense'])",
     "content_width:new Set(['standard','standard_plus','wide','wide_plus','extra_wide','extra_wide_plus','ultra_wide','ultra_wide_plus','max_wide','full'])",
-    'body.width-standard_plus main{max-width:1140px}',
-    'body.width-extra_wide main{max-width:1520px}',
-    'body.width-max_wide main{max-width:2000px}',
+    'body.width-standard_plus main{max-width:none;width:68%}',
+    'body.width-extra_wide main{max-width:none;width:80%}',
+    'body.width-max_wide main{max-width:none;width:96%}',
     'body.density-spacious main{padding:30px 22px 54px}',
     'body.density-ultra_dense main{padding:4px 4px 12px}',
 ):

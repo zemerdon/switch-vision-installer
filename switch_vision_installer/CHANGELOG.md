@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.1.38 — Progressive ten-step content width
+
+- Replace the old fixed-pixel Installer width caps with the shared 64%-to-100% ten-step scale, advancing by four percentage points per step.
+- Keep only step 10 (`Full`) at 100% width so desktop Home Assistant/Ingress viewports visibly change at every slider position instead of saturating several late positions.
+- Preserve the existing mobile <=720px full-width behavior and add regression coverage for the exact progression and removal of the legacy pixel caps.
+
 ## v2.1.37 — Five-step density and ten-step width rendering
 
 - Consume the expanded Core management appearance contract with **five UI density positions** from Spacious through Ultra Dense and **ten content-width positions** from Standard through Full.
