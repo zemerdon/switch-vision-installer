@@ -39,7 +39,9 @@ assert "resultSummaryWithCoreRestart(op.result)" in installer_js
 # becomes a no-op when the old checklist element is absent.
 assert 'id="readiness-section"' not in index
 assert 'id="checklist"' not in index
-assert "const COLLAPSIBLE_SECTIONS=['activity-section','backups-section'];" in installer_js
+assert "const COLLAPSIBLE_SECTIONS=['activity-section'];" in installer_js
+assert 'id="dry-run"' not in index
+assert 'id="backups-section"' not in index
 assert "function renderChecklist(){const target=$('checklist');if(!target)return;" in installer_js
 
 # Explicit 10-20 px shared UI font contract, including legacy migration.

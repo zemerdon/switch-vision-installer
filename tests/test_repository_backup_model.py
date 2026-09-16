@@ -84,8 +84,13 @@ assert 'mappings.append((release_snmp2mqtt, SNMP2MQTT_DIR, "SNMP2MQTT add-on"))'
 
 assert "skipped=(r.skipped||[])" in web_source
 assert "<b>Skipped safely:</b>" in web_source
-assert "unifi2mqtt_configuration_skipped_unconfigured" in web_source
-assert "Not saved (not configured)" in web_source
+# Backup metadata remains authoritative in the backend/Maintenance bridge even
+# though the duplicate Installer backup UI was removed in v2.1.39.
+assert "unifi2mqtt_configuration_skipped_unconfigured" in source
+assert "unifi2mqtt_configuration_skipped_unconfigured" in (
+    ROOT / "switch_vision_installer" / "app" / "web_manager.py"
+).read_text(encoding="utf-8")
+assert "Not saved (not configured)" not in web_source
 
 configured_unifi = {
     "controller_url": "https://192.0.2.2",

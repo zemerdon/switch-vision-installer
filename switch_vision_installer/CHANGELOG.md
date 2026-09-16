@@ -1,3 +1,9 @@
+## v2.1.39 — Streamlined Installer surface
+
+- Remove the user-facing Dry Run button from the Installer; normal install/update already performs the required preflight and backup checks.
+- Remove the redundant Installer Backups panel now that recovery backup creation, validation, restore, deletion, and retention are owned by Switch Vision Maintenance.
+- Keep the existing backup and dry-run backend machinery available to trusted internal/Maintenance workflows; this change removes duplicate UI only.
+
 # Changelog
 
 ## v2.1.38 — Progressive ten-step content width
