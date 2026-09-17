@@ -1,3 +1,9 @@
+## v2.1.40 — Switch Vision Local candidate refresh
+
+- Advance the Installer candidate version so Home Assistant can perform a normal update when the derived **Switch Vision Local** projection gains coordinated local-component behavior.
+- Keep the canonical/public Installer runtime behavior unchanged; Local-only repository/Core routing remains an sv-dev test projection and is not enabled in the public Installer source.
+- Preserve all existing install, update, backup, recovery, privacy, and release-source trust behavior.
+
 ## v2.1.39 — Streamlined Installer surface
 
 - Remove the user-facing Dry Run button from the Installer; normal install/update already performs the required preflight and backup checks.
