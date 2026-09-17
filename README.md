@@ -16,6 +16,12 @@ This is the official Home Assistant App repository for the Switch Vision Install
 
 After the repository is added, the Installer is the only manual installation path required. It downloads the current Switch Vision release, verifies it, backs up the existing installation when required, installs or updates the managed components, and preserves supported user data.
 
+## Checking for updates
+
+**Check for updates** actively refreshes the Switch Vision component sources before reporting what is current. Installer v2.1.41 no longer treats a successful legacy add-on reload as proof that the Home Assistant App Store refresh also succeeded: App Store refresh failures are surfaced instead of being masked as **No updates**.
+
+The Installer then resolves the managed component versions from their authoritative release/repository sources and reports available updates. A failed source refresh is an update-check error, not evidence that the installed versions are current.
+
 ## Managed components
 
 - Switch Vision custom integration
