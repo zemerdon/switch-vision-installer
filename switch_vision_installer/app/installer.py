@@ -815,14 +815,25 @@ def unifi2mqtt_status() -> dict[str, Any]:
 
 
 def reload_addon_store() -> None:
-    errors: list[str] = []
-    for endpoint in ("/addons/reload", "/store/reload"):
-        try:
-            supervisor_request(endpoint, method="POST")
-        except Exception as exc:
-            errors.append(f"{endpoint}: {exc}")
-    if len(errors) == 2:
-        raise RuntimeError("Unable to reload Home Assistant add-on information: " + "; ".join(errors))
+    """Reload Supervisor app metadata, requiring the App Store refresh to succeed.
+
+    `/addons/reload` is retained as a best-effort compatibility refresh for
+    installed/local app metadata, but its success must never mask a failed
+    `/store/reload`: repository-backed update decisions depend on the latter.
+    """
+    addon_error: Exception | None = None
+    try:
+        supervisor_request("/addons/reload", method="POST")
+    except Exception as exc:
+        addon_error = exc
+
+    try:
+        supervisor_request("/store/reload", method="POST")
+    except Exception as store_exc:
+        detail = f"Home Assistant App Store refresh failed: {store_exc}"
+        if addon_error is not None:
+            detail += f"; add-on metadata refresh also failed: {addon_error}"
+        raise RuntimeError(detail) from store_exc
 
 
 def install_supervisor_addon(kind: str) -> dict[str, Any]:

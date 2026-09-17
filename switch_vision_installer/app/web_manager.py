@@ -11,7 +11,7 @@ import sys
 import threading
 
 import web as legacy_web
-from component_manager import _set_repository_compatibility, component_changelog, component_status_with_releases, update_all, update_component
+from component_manager import _set_repository_compatibility, component_changelog, component_status_with_releases, refresh_component_sources, update_all, update_component
 
 
 SUPERVISOR_INGRESS_IP = "172.30.32.2"
@@ -257,6 +257,8 @@ class Handler(legacy_web.Handler):
             return
         parsed = urlsplit(self.path)
         try:
+            if parsed.path == "/api/check-components":
+                return self.send_json(refresh_component_sources())
             if parsed.path in {
                 "/api/install",
                 "/api/install-discovery",

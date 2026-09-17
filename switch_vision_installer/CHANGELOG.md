@@ -1,3 +1,9 @@
+## v2.1.41 — Reliable component update checks
+
+- Make **Check for updates** perform an explicit component-source refresh before reporting component versions instead of only reloading the Installer page state.
+- Treat Home Assistant App Store (`/store/reload`) refresh failure as authoritative even when the legacy add-on metadata reload succeeds, preventing stale repository state from being misreported as current.
+- Keep normal public repository/version authority unchanged; the private Switch Vision Local projection can layer exact staged-source verification and bounded repository repair onto the same refresh hook.
+
 ## v2.1.40 — Switch Vision Local candidate refresh
 
 - Advance the Installer candidate version so Home Assistant can perform a normal update when the derived **Switch Vision Local** projection gains coordinated local-component behavior.

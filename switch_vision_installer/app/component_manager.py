@@ -520,6 +520,13 @@ def component_status_with_releases() -> dict[str, Any]:
     return snapshot
 
 
+def refresh_component_sources() -> dict[str, Any]:
+    """Refresh Supervisor-backed component sources and return a fresh snapshot."""
+    installer_core.reload_addon_store()
+    clear_cache()
+    return component_status_with_releases()
+
+
 def component_changelog(component_id: str) -> dict[str, Any]:
     spec = _spec(component_id)
     repository = resolve_repository(spec)
