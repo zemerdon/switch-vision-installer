@@ -2094,7 +2094,7 @@ def build_frontend_stage(root: Path, target: Path) -> None:
         if source.is_dir(): shutil.copytree(source, target / folder)
 
 
-def component_plan(root: Path) -> tuple[list[tuple[Path, Path, str]], list[str], list[str]]:
+def component_plan(root: Path, *, force: bool = False) -> tuple[list[tuple[Path, Path, str]], list[str], list[str]]:
     with tempfile.TemporaryDirectory(dir=WORK_DIR) as td:
         frontend_stage = Path(td) / "frontend"
         build_frontend_stage(root, frontend_stage)
@@ -2107,15 +2107,15 @@ def component_plan(root: Path) -> tuple[list[tuple[Path, Path, str]], list[str],
         if persistent.exists(): shutil.rmtree(persistent)
         shutil.copytree(frontend_stage, persistent)
         mappings = [(persistent if label == "Dashboard frontend and visual assets" else src, dst, label) for src, dst, label in mappings]
-    changed = [(src, dst, label) for src, dst, label in mappings if tree_digest(src) != tree_digest(dst)]
-    unchanged = [label for src, dst, label in mappings if tree_digest(src) == tree_digest(dst)]
+    changed = list(mappings) if force else [(src, dst, label) for src, dst, label in mappings if tree_digest(src) != tree_digest(dst)]
+    unchanged = [] if force else [label for src, dst, label in mappings if tree_digest(src) == tree_digest(dst)]
     missing = [label for src, dst, label in mappings if not dst.exists()]
     return changed, unchanged, missing
 
 
-def install_release(root: Path, version: str, checksum: str, progress: Progress | None = None) -> InstallResult:
-    if progress: progress("Comparing installed components…", 48)
-    changed, unchanged, _ = component_plan(root)
+def install_release(root: Path, version: str, checksum: str, progress: Progress | None = None, *, force: bool = False) -> InstallResult:
+    if progress: progress("Preparing forced Core reinstall…" if force else "Comparing installed components…", 48)
+    changed, unchanged, _ = component_plan(root, force=force)
     backup = create_backup() if changed else None
     if backup is not None:
         validate_backup(backup)
@@ -2233,10 +2233,10 @@ def dry_run(progress: Progress | None = None) -> dict[str, Any]:
         shutil.rmtree(WORK_DIR / "plan-frontend", ignore_errors=True)
 
 
-def download_and_install(progress: Progress | None = None) -> InstallResult:
+def download_and_install(progress: Progress | None = None, *, force: bool = False) -> InstallResult:
     release, tmp_path, root, checksum, _ = prepare_release(progress)
     try:
-        result = install_release(root, str(release["version"]), checksum, progress)
+        result = install_release(root, str(release["version"]), checksum, progress, force=force)
         if progress: progress("Installation completed successfully.", 100)
         return result
     finally:

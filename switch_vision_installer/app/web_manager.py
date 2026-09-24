@@ -11,7 +11,7 @@ import sys
 import threading
 
 import web as legacy_web
-from component_manager import _set_repository_compatibility, component_changelog, component_status_with_releases, refresh_component_sources, update_all, update_component
+from component_manager import _set_repository_compatibility, component_changelog, component_status_with_releases, refresh_component_sources, reinstall_component, update_all, update_component
 
 
 SUPERVISOR_INGRESS_IP = "172.30.32.2"
@@ -272,6 +272,18 @@ class Handler(legacy_web.Handler):
                 if not legacy_web.start_job(
                     f"update {component}",
                     lambda: update_component(component, legacy_web.set_progress),
+                ):
+                    return self.send_json(
+                        {"ok": False, "error": "Another installer operation is already running."},
+                        409,
+                    )
+                return self.send_json({"ok": True, "started": True, "component": component}, 202)
+            if parsed.path == "/api/reinstall-component":
+                payload = self.body()
+                component = str(payload.get("component") or "").strip()
+                if not legacy_web.start_job(
+                    f"reinstall {component}",
+                    lambda: reinstall_component(component, legacy_web.set_progress),
                 ):
                     return self.send_json(
                         {"ok": False, "error": "Another installer operation is already running."},

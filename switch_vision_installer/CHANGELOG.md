@@ -1,3 +1,10 @@
+## v2.1.42 — Per-component reinstall controls
+
+- Add an explicit **Reinstall** action to every managed component row.
+- Core reinstall forces verified Core/frontend replacement even when the installed version already matches the latest release, retaining the existing backup/rollback and custom-asset preservation contract.
+- Repository-app reinstall preserves saved options and prior running state, uninstalls without removing app configuration, reinstalls the exact repository version, restores options, and verifies the final version/state.
+- The Installer row exposes **Reinstall in Home Assistant** because a running Installer cannot safely remove and replace itself.
+
 ## v2.1.41 — Reliable component update checks
 
 - Make **Check for updates** perform an explicit component-source refresh before reporting component versions instead of only reloading the Installer page state.

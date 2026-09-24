@@ -691,6 +691,131 @@ def _addon_update(component_id: str, progress: Progress | None = None) -> dict[s
         "component_update": component_id,
     }
 
+def _addon_reinstall(component_id: str, progress: Progress | None = None) -> dict[str, Any]:
+    """Reinstall one repository-backed app while preserving user configuration."""
+    _set_repository_compatibility()
+    spec = _spec(component_id)
+    expected_version = installer_core.normalise_version(_remote_version(spec))
+    status = _component_status(spec)
+    if not status.get("installed"):
+        return _addon_update(component_id, progress)
+
+    slug = str(status.get("slug") or "").strip()
+    if not slug:
+        raise RuntimeError(f"{spec.label} is installed but its Supervisor slug could not be resolved.")
+
+    info = installer_core.addon_info(slug)
+    previous_version = installer_core.normalise_version(info.get("version"))
+    previous_state = str(info.get("state") or "").strip().lower()
+    saved_options = info.get("options")
+    if saved_options is not None and not isinstance(saved_options, dict):
+        raise RuntimeError(f"{spec.label} options could not be captured safely before reinstall.")
+
+    if progress:
+        progress(f"Preparing {spec.label} reinstall…", 20)
+    installer_core.supervisor_request(
+        f"/addons/{slug}/uninstall",
+        method="POST",
+        payload={"remove_config": False},
+    )
+
+    if progress:
+        progress(f"Refreshing the {spec.label} repository…", 40)
+    installer_core.reload_addon_store()
+
+    if progress:
+        progress(f"Reinstalling {spec.label} v{expected_version or previous_version or 'latest'}…", 55)
+    installer_core.supervisor_store_request(
+        f"/store/addons/{slug}/install",
+        payload={"background": False},
+        progress=progress,
+    )
+    info = installer_core.wait_for_addon(
+        slug,
+        expected_version=expected_version or previous_version or None,
+        timeout=300,
+    )
+
+    if isinstance(saved_options, dict):
+        if progress:
+            progress(f"Restoring {spec.label} settings…", 82)
+        installer_core.supervisor_request(
+            f"/addons/{slug}/options",
+            method="POST",
+            payload={"options": saved_options},
+        )
+
+    if previous_state in {"started", "running"}:
+        if str(info.get("state") or "").strip().lower() not in {"started", "running"}:
+            installer_core.supervisor_request(f"/addons/{slug}/start", method="POST")
+        info = installer_core.wait_for_addon(
+            slug,
+            expected_version=expected_version or previous_version or None,
+            expected_state="started",
+            timeout=180,
+        )
+
+    actual_version = installer_core.normalise_version(info.get("version"))
+    wanted_version = expected_version or previous_version
+    if wanted_version and actual_version != wanted_version:
+        raise RuntimeError(
+            f"{spec.label} reinstall verification failed: expected v{wanted_version}, "
+            f"received v{actual_version or 'unknown'}."
+        )
+
+    clear_cache()
+    if progress:
+        progress(f"{spec.label} reinstall verified.", 100)
+    return {
+        "ok": True,
+        "version": actual_version,
+        "installed": [spec.label],
+        "unchanged": [],
+        "required_actions": [],
+        "component_reinstall": component_id,
+        "settings_restored": isinstance(saved_options, dict),
+        "running_state_restored": previous_state in {"started", "running"},
+    }
+
+
+def reinstall_component(component_id: str, progress: Progress | None = None) -> dict[str, Any]:
+    spec = _spec(component_id)
+    status = _component_status(spec)
+    if not status.get("installed") and spec.kind != "installer":
+        raise RuntimeError(f"{spec.label} is not installed. Use Install instead.")
+
+    if spec.min_core and not status.get("dependency_ok"):
+        raise RuntimeError(
+            f"{spec.label} cannot be reinstalled yet. {status.get('dependency_note')}. "
+            "Update Switch Vision Core first."
+        )
+
+    if spec.kind == "core":
+        if progress:
+            progress("Reinstalling Switch Vision Core from the verified public release…", 10)
+        result = installer_core.download_and_install(progress, force=True)
+        clear_cache()
+        payload = result.__dict__.copy()
+        payload["component_reinstall"] = "core"
+        return payload
+    if spec.kind == "installer":
+        current = installer_core.normalise_version(status.get("installed_version"))
+        if progress:
+            progress("Installer reinstall must be completed from Home Assistant Apps.", 100)
+        return {
+            "ok": True,
+            "version": current,
+            "installed": [],
+            "unchanged": ["Switch Vision Installer"],
+            "required_actions": [
+                "Reinstall Switch Vision Installer from Home Assistant Settings → Apps → Switch Vision Installer."
+            ],
+            "component_reinstall": "installer",
+            "self_reinstall_external": True,
+        }
+    return _addon_reinstall(component_id, progress)
+
+
 def _installer_slug() -> str:
     addon = installer_core._find_addon(
         lambda slug, name: (

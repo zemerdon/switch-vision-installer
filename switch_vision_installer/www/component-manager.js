@@ -66,6 +66,7 @@ function renderManagedComponents(){
       <strong class="managed-component-state ${cls}">${esc(status)}</strong>
       <div class="managed-component-actions">
         <button class="secondary component-changelog" type="button" data-component="${esc(row.id)}">Changelog</button>
+        ${row.installed?`<button class="${row.id==='installer'?'component-external-reinstall':'component-reinstall'}" type="button" data-component="${esc(row.id)}" data-label="${esc(row.label)}" ${(!row.dependency_ok&&row.id==='discovery')?'disabled':''}>${row.id==='installer'?'Reinstall in Home Assistant':'Reinstall'}</button>`:''}
         ${action?`<button class="${row.id==='installer'?'component-external-update':'component-update'}" type="button" data-component="${esc(row.id)}" ${(!row.dependency_ok&&row.id==='discovery')?'disabled':''}>${esc(action)}</button>`:''}
       </div>
     </div>`;
@@ -117,6 +118,15 @@ async function requestComponentUpdate(component){
   }catch(error){showResult(`Component update failed: ${esc(error.message)}`,'error');}
 }
 
+async function requestComponentReinstall(component,label){
+  const name=label||component;
+  if(!window.confirm(`Reinstall ${name}? Saved app settings are preserved, but the component may stop briefly while its package is replaced.`))return;
+  try{
+    await json('api/reinstall-component',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({component})});
+    pollOperation();
+  }catch(error){showResult(`Component reinstall failed: ${esc(error.message)}`,'error');}
+}
+
 const legacyRenderComponents=renderComponents;
 renderComponents=function(){renderManagedComponents();};
 
@@ -129,6 +139,10 @@ refresh=async function(showLast=true){
 $('components').addEventListener('click',event=>{
   const changelog=event.target.closest('.component-changelog');
   if(changelog){openComponentChangelog(changelog.dataset.component);return;}
+  const externalReinstall=event.target.closest('.component-external-reinstall');
+  if(externalReinstall){showResult('Reinstall Switch Vision Installer from Home Assistant Settings → Apps → Switch Vision Installer. The running Installer cannot safely remove and replace itself.','muted');return;}
+  const reinstall=event.target.closest('.component-reinstall');
+  if(reinstall){requestComponentReinstall(reinstall.dataset.component,reinstall.dataset.label);return;}
   const external=event.target.closest('.component-external-update');
   if(external){showResult('Update Switch Vision Installer from Home Assistant Settings → Apps → Switch Vision Installer. The running Installer cannot safely replace itself.','muted');return;}
   const update=event.target.closest('.component-update');

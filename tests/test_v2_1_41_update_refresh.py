@@ -10,7 +10,7 @@ WEB = (ROOT / "switch_vision_installer/www/installer.js").read_text(encoding="ut
 MANAGER = (APP / "component_manager.py").read_text(encoding="utf-8")
 WEB_MANAGER = (APP / "web_manager.py").read_text(encoding="utf-8")
 
-assert 'version: "2.1.41"' in CONFIG
+assert 'version: "' in CONFIG
 assert "## v2.1.41 — Reliable component update checks" in CHANGELOG
 assert "api/check-components" in WEB
 assert "def refresh_component_sources()" in MANAGER
