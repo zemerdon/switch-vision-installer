@@ -23,19 +23,17 @@ sys.modules[spec.name] = mod
 spec.loader.exec_module(mod)
 
 calls = []
-def request_ok(path, method="GET", payload=None):
-    calls.append((path, method))
-    if path == "/addons/reload":
-        raise RuntimeError("legacy endpoint unavailable")
+def request_ok(path, method="GET", payload=None, *, timeout=30.0):
+    calls.append((path, method, timeout))
     return {"result": "ok"}
 
 mod.supervisor_request = request_ok
 mod.reload_addon_store()
-assert calls == [("/addons/reload", "POST"), ("/store/reload", "POST")]
+assert calls == [("/store/reload", "POST", 180.0)]
 
 calls.clear()
-def request_store_fail(path, method="GET", payload=None):
-    calls.append((path, method))
+def request_store_fail(path, method="GET", payload=None, *, timeout=30.0):
+    calls.append((path, method, timeout))
     if path == "/store/reload":
         raise RuntimeError("store pull failed")
     return {"result": "ok"}
@@ -46,6 +44,7 @@ try:
 except RuntimeError as exc:
     assert "App Store refresh failed" in str(exc)
 else:
-    raise AssertionError("store reload failure must not be masked by /addons/reload success")
+    raise AssertionError("store reload failure must remain fail-closed")
+assert calls == [("/store/reload", "POST", 180.0)]
 
 print("Installer v2.1.41 reliable update refresh regression: PASS")

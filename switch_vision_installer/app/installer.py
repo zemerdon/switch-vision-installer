@@ -11,6 +11,7 @@ import os
 import shutil
 import stat
 import tempfile
+import threading
 import time
 import urllib.request
 import urllib.error
@@ -71,8 +72,15 @@ OFFICIAL_RELEASE_RAW_BASE = (
 )
 
 SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN", "")
+_STORE_RELOAD_LOCK = threading.Lock()
 
-def supervisor_request(path: str, method: str = "GET", payload: dict[str, Any] | None = None) -> dict[str, Any]:
+def supervisor_request(
+    path: str,
+    method: str = "GET",
+    payload: dict[str, Any] | None = None,
+    *,
+    timeout: float = 30.0,
+) -> dict[str, Any]:
     if not SUPERVISOR_TOKEN:
         raise RuntimeError("Supervisor API token is unavailable.")
     data = None if payload is None else json.dumps(payload).encode("utf-8")
@@ -86,7 +94,8 @@ def supervisor_request(path: str, method: str = "GET", payload: dict[str, Any] |
         },
     )
     try:
-        with urllib.request.urlopen(request, timeout=30) as response:
+        request_timeout = max(1.0, min(float(timeout), 180.0))
+        with urllib.request.urlopen(request, timeout=request_timeout) as response:
             return json.load(response)
     except urllib.error.HTTPError as exc:
         try:
@@ -815,25 +824,20 @@ def unifi2mqtt_status() -> dict[str, Any]:
 
 
 def reload_addon_store() -> None:
-    """Reload Supervisor app metadata, requiring the App Store refresh to succeed.
+    """Refresh Supervisor App Store metadata once, with bounded serialization.
 
-    `/addons/reload` is retained as a best-effort compatibility refresh for
-    installed/local app metadata, but its success must never mask a failed
-    `/store/reload`: repository-backed update decisions depend on the latter.
+    Current Supervisor versions make both /addons/reload and /store/reload
+    perform repository updates. Calling them back-to-back can overlap long
+    refresh tasks after a client-side timeout. One serialized /store/reload is
+    the authoritative refresh for Installer update decisions.
     """
-    addon_error: Exception | None = None
-    try:
-        supervisor_request("/addons/reload", method="POST")
-    except Exception as exc:
-        addon_error = exc
-
-    try:
-        supervisor_request("/store/reload", method="POST")
-    except Exception as store_exc:
-        detail = f"Home Assistant App Store refresh failed: {store_exc}"
-        if addon_error is not None:
-            detail += f"; add-on metadata refresh also failed: {addon_error}"
-        raise RuntimeError(detail) from store_exc
+    with _STORE_RELOAD_LOCK:
+        try:
+            supervisor_request("/store/reload", method="POST", timeout=180.0)
+        except Exception as store_exc:
+            raise RuntimeError(
+                f"Home Assistant App Store refresh failed: {store_exc}"
+            ) from store_exc
 
 
 def install_supervisor_addon(kind: str) -> dict[str, Any]:
