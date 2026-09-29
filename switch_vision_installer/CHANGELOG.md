@@ -1,3 +1,9 @@
+## v2.1.43 — Reliable serialized App Store refresh
+
+- Serialize Home Assistant App Store refreshes through one authoritative `/store/reload` request instead of back-to-back add-on/store reload calls that can overlap long Supervisor repository updates.
+- Allow the authoritative Supervisor refresh request up to 180 seconds to complete while remaining bounded and fail-closed on refresh errors.
+- Preserve existing component-source refresh, update-check, reinstall, backup, recovery, option/state restoration, and release-source trust behavior.
+
 ## v2.1.42 — Per-component reinstall controls
 
 - Add an explicit **Reinstall** action to every managed component row.

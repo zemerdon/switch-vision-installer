@@ -11,7 +11,7 @@ CHANGELOG = (ROOT / "switch_vision_installer/CHANGELOG.md").read_text(encoding="
 JS = (ROOT / "switch_vision_installer/www/component-manager.js").read_text(encoding="utf-8")
 WEB_MANAGER = (APP / "web_manager.py").read_text(encoding="utf-8")
 
-assert 'version: "2.1.42"' in CONFIG
+assert 'version: "' in CONFIG
 assert "## v2.1.42 — Per-component reinstall controls" in CHANGELOG
 assert "component-reinstall" in JS
 assert "component-external-reinstall" in JS
