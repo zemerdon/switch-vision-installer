@@ -13,6 +13,7 @@ INSTALLER = ROOT / "switch_vision_installer" / "app" / "installer.py"
 WEB = ROOT / "switch_vision_installer" / "app" / "web.py"
 WEB_MANAGER = ROOT / "switch_vision_installer" / "app" / "web_manager.py"
 COMPONENT_MANAGER = ROOT / "switch_vision_installer" / "app" / "component_manager.py"
+BACKUP_MANAGER = ROOT / "switch_vision_installer" / "app" / "backup_manager.py"
 
 spec = importlib.util.spec_from_file_location("sv_installer_v219_test", INSTALLER)
 if spec is None or spec.loader is None:
@@ -136,10 +137,11 @@ with tempfile.TemporaryDirectory() as td:
     assert stat.S_IMODE(secret.stat().st_mode) == 0o600
 
 installer_source = INSTALLER.read_text(encoding="utf-8")
+backup_source = BACKUP_MANAGER.read_text(encoding="utf-8")
 assert "Compatibility install endpoint also failed" in installer_source
-assert "Backup permission verification failed" in installer_source
-assert "Backup contains unsupported symbolic link" in installer_source
-assert "options could not be captured safely" in installer_source
+assert "Backup permission verification failed" in backup_source
+assert "Backup contains unsupported symbolic link" in backup_source
+assert "options could not be captured safely" in backup_source
 assert "asset_name_lower = expected_name.lower()" in installer_source
 
 # Transactional restore rolls files/settings back if a later restore step fails.
@@ -231,10 +233,10 @@ component_source = COMPONENT_MANAGER.read_text(encoding="utf-8")
 
 assert 'expected_name = f"switch-vision-{version}.zip"' in installer_source
 assert "Release identity mismatch" in installer_source
-assert "def _capture_restore_snapshot" in installer_source
-assert "def _rollback_restore_snapshot" in installer_source
-assert "transactional_restore" in installer_source
-assert "target.chmod(0o700)" in installer_source
+assert "def capture_restore_snapshot" in backup_source
+assert "def rollback_restore_snapshot" in backup_source
+assert "transactional_restore" in backup_source
+assert "target.chmod(0o700)" in backup_source
 assert "def start_job" in web_source
 assert "Reserve the mutation slot before returning HTTP 202" in web_source
 assert 'run_locked("delete backup"' in web_source

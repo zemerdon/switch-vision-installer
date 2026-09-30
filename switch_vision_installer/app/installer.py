@@ -17,6 +17,15 @@ import urllib.request
 import urllib.error
 import zipfile
 import re
+import sys
+
+_MODULE_DIR = Path(__file__).resolve().parent
+if str(_MODULE_DIR) not in sys.path:
+    sys.path.insert(0, str(_MODULE_DIR))
+
+import backup_manager as _backup_manager
+import tree_transaction as _tree_transaction
+
 
 INSTALLER_VERSION = "2.1.25"
 OPTIONS_PATH = Path(os.environ.get("SV_INSTALLER_OPTIONS", "/data/options.json"))
@@ -1294,381 +1303,150 @@ def find_release_root(extracted: Path) -> Path:
     raise RuntimeError("Release ZIP does not contain the expected Switch Vision custom component.")
 
 
+def _backup_runtime() -> _backup_manager.BackupRuntime:
+    return _backup_manager.BackupRuntime(
+        backup_dir=BACKUP_DIR,
+        backup_policy_path=BACKUP_POLICY_PATH,
+        legacy_backup_dir=LEGACY_BACKUP_DIR,
+        work_dir=WORK_DIR,
+        ha_config=HA_CONFIG,
+        component_dir=COMPONENT_DIR,
+        frontend_dir=FRONTEND_DIR,
+        generated_snmp2mqtt_yaml=GENERATED_SNMP2MQTT_YAML,
+        installer_version=INSTALLER_VERSION,
+        load_options=load_options,
+        get_discovery_options=get_discovery_options,
+        get_snmp2mqtt_options=get_snmp2mqtt_options,
+        get_unifi2mqtt_options=get_unifi2mqtt_options,
+        set_discovery_options=set_discovery_options,
+        set_snmp2mqtt_options=set_snmp2mqtt_options,
+        set_unifi2mqtt_options=set_unifi2mqtt_options,
+        discovery_status=discovery_status,
+        snmp2mqtt_status=snmp2mqtt_status,
+        unifi2mqtt_status=unifi2mqtt_status,
+        installed_version=installed_version,
+        configured_switch_count=configured_switch_count,
+        unifi2mqtt_options_configured=unifi2mqtt_options_configured,
+        sha256=sha256,
+        replace_tree=replace_tree,
+        copy_backup=copy_backup,
+        backup_contents=backup_contents,
+        backup_file_hashes=backup_file_hashes,
+        secure_backup_permissions=secure_backup_permissions,
+        validate_backup=validate_backup,
+        backup_policy=backup_policy,
+        prune_backups=prune_backups,
+        create_backup=create_backup,
+        backup_roots=_backup_roots,
+        safe_backup_path=_safe_backup_path,
+        restore_backup_contents=_restore_backup_contents,
+        capture_restore_snapshot=_capture_restore_snapshot,
+        rollback_restore_snapshot=_rollback_restore_snapshot,
+    )
+
+
 def copy_backup(source: Path, root: Path, label: str) -> None:
-    if source.exists():
-        shutil.copytree(source, root / label, dirs_exist_ok=True)
+    return _backup_manager.copy_backup(source, root, label)
 
 
 def backup_contents(path: Path) -> list[str]:
-    entries = []
-    if (path / "custom_components/switch_vision").is_dir(): entries.append("Custom component")
-    if (path / "www/switch-vision").is_dir(): entries.append("Dashboard frontend")
-    if (path / ".storage/switch_vision_calibrations").is_file(): entries.append("Calibration storage")
-    if (path / "discovery-options.json").is_file(): entries.append("Discovery configuration")
-    if (path / "snmp2mqtt-options.json").is_file(): entries.append("SNMP2MQTT configuration")
-    if (path / "unifi2mqtt-options.json").is_file(): entries.append("UniFi2MQTT configuration")
-    if (path / "share/switch_vision/generated-snmp2mqtt.yaml").is_file(): entries.append("Generated SNMP2MQTT YAML")
-    return entries
-
+    return _backup_manager.backup_contents(path)
 
 
 def backup_file_hashes(path: Path) -> dict[str, str]:
-    hashes: dict[str, str] = {}
-    for file in sorted(p for p in path.rglob("*") if p.is_file() and p.name not in {"backup.json", "backup-manifest.json"}):
-        hashes[file.relative_to(path).as_posix()] = sha256(file)
-    return hashes
+    return _backup_manager.backup_file_hashes(_backup_runtime(), path)
 
 
 def secure_backup_permissions(path: Path) -> None:
-    # Supervisor option files inside backups may contain credentials. Fail closed
-    # if owner-only permissions cannot be applied and verified.
-    entries = [path, *path.rglob("*")]
-    for entry in entries:
-        if entry.is_symlink():
-            raise RuntimeError(f"Backup contains unsupported symbolic link: {entry}")
-        mode = 0o700 if entry.is_dir() else 0o600
-        try:
-            entry.chmod(mode)
-            observed = stat.S_IMODE(entry.stat().st_mode)
-        except OSError as exc:
-            raise RuntimeError(
-                f"Could not secure backup permissions for {entry}: {exc}"
-            ) from exc
-        if observed != mode:
-            raise RuntimeError(
-                f"Backup permission verification failed for {entry}: "
-                f"expected {oct(mode)}, observed {oct(observed)}."
-            )
+    return _backup_manager.secure_backup_permissions(path)
 
 
 def validate_backup(path: Path) -> dict[str, Any]:
-    manifest_path = path / "backup-manifest.json"
-    if not manifest_path.is_file():
-        # Upgrade older installer backups in place so v1.8.3 and earlier remain restorable.
-        manifest = {
-            "schema": 1,
-            "installer_version": "legacy",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "installed_version": None,
-            "files": backup_file_hashes(path),
-        }
-        manifest_path.write_text(
-            json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
-        )
-    else:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    expected = manifest.get("files")
-    if not isinstance(expected, dict):
-        raise RuntimeError("Backup validation failed: manifest file list is invalid.")
-    missing: list[str] = []
-    mismatched: list[str] = []
-    for relative, digest in expected.items():
-        file = path / relative
-        if not file.is_file():
-            missing.append(relative)
-        elif sha256(file) != digest:
-            mismatched.append(relative)
-    if missing or mismatched:
-        detail = []
-        if missing:
-            detail.append("missing: " + ", ".join(missing[:10]))
-        if mismatched:
-            detail.append("checksum mismatch: " + ", ".join(mismatched[:10]))
-        raise RuntimeError(
-            "Backup validation failed (" + "; ".join(detail) + ")."
-        )
-    secure_backup_permissions(path)
-    return {"ok": True, "file_count": len(expected), "manifest": manifest}
+    return _backup_manager.validate_backup(_backup_runtime(), path)
+
 
 def backup_policy() -> dict[str, Any]:
-    """Return the Installer-owned retention policy without exposing backups."""
-    if BACKUP_POLICY_PATH.exists():
-        if BACKUP_POLICY_PATH.is_symlink() or not BACKUP_POLICY_PATH.is_file():
-            raise RuntimeError("Installer backup policy is not a regular file.")
-        try:
-            document = json.loads(BACKUP_POLICY_PATH.read_text(encoding="utf-8"))
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise RuntimeError(f"Installer backup policy is unreadable: {exc}") from exc
-        if (
-            not isinstance(document, dict)
-            or document.get("schema") != "switch-vision-installer-backup-policy-v1"
-        ):
-            raise RuntimeError("Installer backup policy has an unsupported schema.")
-        automatic = document.get("automatic_retention")
-        retention = document.get("retention_count")
-        if not isinstance(automatic, bool):
-            raise RuntimeError("Installer backup policy automatic_retention is invalid.")
-        if (
-            isinstance(retention, bool)
-            or not isinstance(retention, int)
-            or not 1 <= retention <= 10
-        ):
-            raise RuntimeError("Installer backup policy retention_count must be 1 through 10.")
-        return {
-            "automatic_retention": automatic,
-            "retention_count": retention,
-        }
-
-    # Pre-v2.1.31 retention was always automatic. Preserve the previous count
-    # as the first Maintenance default, clamped to the new 1-10 contract.
-    try:
-        legacy_retention = int(load_options().get("backup_retention", 5))
-    except (TypeError, ValueError):
-        legacy_retention = 5
-    return {
-        "automatic_retention": True,
-        "retention_count": max(1, min(10, legacy_retention)),
-    }
+    return _backup_manager.backup_policy(_backup_runtime())
 
 
 def save_backup_policy(
     automatic_retention: Any,
     retention_count: Any,
 ) -> dict[str, Any]:
-    if not isinstance(automatic_retention, bool):
-        raise ValueError("Automatic backup retention must be true or false.")
-    if (
-        isinstance(retention_count, bool)
-        or not isinstance(retention_count, int)
-        or not 1 <= retention_count <= 10
-    ):
-        raise ValueError("Retained backup count must be between 1 and 10.")
-
-    payload = {
-        "schema": "switch-vision-installer-backup-policy-v1",
-        "automatic_retention": automatic_retention,
-        "retention_count": retention_count,
-    }
-    BACKUP_POLICY_PATH.parent.mkdir(parents=True, exist_ok=True)
-    temp = BACKUP_POLICY_PATH.parent / (
-        f".{BACKUP_POLICY_PATH.name}.{os.getpid()}.tmp"
+    return _backup_manager.save_backup_policy(
+        _backup_runtime(),
+        automatic_retention,
+        retention_count,
     )
-    try:
-        with temp.open("w", encoding="utf-8") as handle:
-            json.dump(payload, handle, indent=2)
-            handle.write("\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        temp.chmod(0o600)
-        os.replace(temp, BACKUP_POLICY_PATH)
-    finally:
-        if temp.exists():
-            temp.unlink()
-    return {
-        "automatic_retention": automatic_retention,
-        "retention_count": retention_count,
-    }
 
 
 def prune_backups(*, force: bool = False) -> dict[str, Any]:
-    policy = backup_policy()
-    keep = int(policy["retention_count"])
-    paths = sorted((p for p in BACKUP_DIR.iterdir() if p.is_dir()), reverse=True)
-    if not force and not policy["automatic_retention"]:
-        return {
-            "ok": True,
-            "automatic_retention": False,
-            "retention": keep,
-            "retention_skipped": True,
-            "removed": [],
-            "remaining": len(paths),
-        }
-
-    removed: list[str] = []
-    for old in paths[keep:]:
-        removed.append(old.name)
-        shutil.rmtree(old, ignore_errors=True)
-    return {
-        "ok": True,
-        "automatic_retention": bool(policy["automatic_retention"]),
-        "retention": keep,
-        "retention_skipped": False,
-        "removed": removed,
-        "remaining": max(0, len(paths) - len(removed)),
-    }
+    return _backup_manager.prune_backups(
+        _backup_runtime(),
+        force=force,
+    )
 
 
 def apply_backup_retention() -> dict[str, Any]:
-    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    result = prune_backups(force=True)
-    result["backup_path"] = str(BACKUP_DIR)
-    return result
+    return _backup_manager.apply_backup_retention(_backup_runtime())
 
 
 def create_backup(force: bool = False) -> Path | None:
-    if not force and not load_options().get("create_backup", True): return None
-    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
-    target = BACKUP_DIR / f"switch-vision-{stamp}"
-    target.mkdir(parents=True, exist_ok=False)
-    target.chmod(0o700)
-    copy_backup(COMPONENT_DIR, target, "custom_components/switch_vision")
-    copy_backup(FRONTEND_DIR, target, "www/switch-vision")
-    discovery_options = get_discovery_options()
-    if discovery_options is not None:
-        (target / "discovery-options.json").write_text(json.dumps(discovery_options, indent=2) + "\n", encoding="utf-8")
-    snmp2mqtt_options = get_snmp2mqtt_options()
-    if snmp2mqtt_options is not None:
-        (target / "snmp2mqtt-options.json").write_text(json.dumps(snmp2mqtt_options, indent=2) + "\n", encoding="utf-8")
-    unifi2mqtt_options = get_unifi2mqtt_options()
-    unifi2mqtt_configuration_saved = unifi2mqtt_options_configured(unifi2mqtt_options)
-    unifi2mqtt_configuration_skipped_unconfigured = (
-        unifi2mqtt_options is not None and not unifi2mqtt_configuration_saved
+    return _backup_manager.create_backup(
+        _backup_runtime(),
+        force=force,
     )
-    if unifi2mqtt_configuration_saved:
-        (target / "unifi2mqtt-options.json").write_text(json.dumps(unifi2mqtt_options, indent=2) + "\n", encoding="utf-8")
-    if GENERATED_SNMP2MQTT_YAML.is_file():
-        yaml_target = target / "share" / "switch_vision" / GENERATED_SNMP2MQTT_YAML.name
-        yaml_target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(GENERATED_SNMP2MQTT_YAML, yaml_target)
-    storage = HA_CONFIG / ".storage" / "switch_vision_calibrations"
-    if storage.exists():
-        (target / ".storage").mkdir(parents=True, exist_ok=True); shutil.copy2(storage, target / ".storage" / storage.name)
-    meta = {
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "installed_version": installed_version(),
-        "contents": backup_contents(target),
-        "discovery_configuration_saved": discovery_options is not None,
-        "configured_switches": configured_switch_count(discovery_options),
-        "snmp2mqtt_configuration_saved": snmp2mqtt_options is not None,
-        "unifi2mqtt_configuration_saved": unifi2mqtt_configuration_saved,
-        "unifi2mqtt_configuration_skipped_unconfigured": unifi2mqtt_configuration_skipped_unconfigured,
-        "snmp2mqtt_generated_yaml_saved": GENERATED_SNMP2MQTT_YAML.is_file(),
-    }
-    (target / "backup.json").write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
-    manifest = {
-        "schema": 1,
-        "installer_version": INSTALLER_VERSION,
-        "created_at": meta["created_at"],
-        "installed_version": meta["installed_version"],
-        "files": backup_file_hashes(target),
-    }
-    (target / "backup-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-    validate_backup(target)
-    prune_backups()
-    return target
 
 
-def create_manual_backup(progress: Progress | None = None) -> dict[str, Any]:
-    if progress: progress("Collecting Switch Vision files and settings…", 15)
-    target = create_backup(force=True)
-    if target is None:
-        raise RuntimeError("Backup creation did not return a backup path.")
-    if progress: progress("Validating backup checksums…", 80)
-    validation = validate_backup(target)
-    meta: dict[str, Any] = {}
-    try:
-        meta = json.loads((target / "backup.json").read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        pass
-    if progress: progress("Backup created and verified.", 100)
-    return {
-        "ok": True,
-        "backup_created": True,
-        "backup": target.name,
-        "backup_path": str(target),
-        "verified": True,
-        "file_count": validation.get("file_count", 0),
-        "version": meta.get("installed_version"),
-        "contents": meta.get("contents") or backup_contents(target),
-        "configured_switches": int(meta.get("configured_switches") or 0),
-        "completed_at": datetime.now(timezone.utc).isoformat(),
-    }
+def create_manual_backup(
+    progress: Progress | None = None,
+) -> dict[str, Any]:
+    return _backup_manager.create_manual_backup(
+        _backup_runtime(),
+        progress,
+    )
 
 
-def validate_named_backup(name: str, progress: Progress | None = None) -> dict[str, Any]:
-    backup = _safe_backup_path(name)
-    if progress: progress(f"Validating {name}…", 25)
-    validation = validate_backup(backup)
-    if progress: progress("Backup validation completed.", 100)
-    return {
-        "ok": True,
-        "backup_validated": True,
-        "backup": name,
-        "verified": True,
-        "file_count": validation.get("file_count", 0),
-        "completed_at": datetime.now(timezone.utc).isoformat(),
-    }
+def validate_named_backup(
+    name: str,
+    progress: Progress | None = None,
+) -> dict[str, Any]:
+    return _backup_manager.validate_named_backup(
+        _backup_runtime(),
+        name,
+        progress,
+    )
 
 
 def _backup_roots() -> list[Path]:
-    # Only Installer-private /data backups are trusted for validation, restore,
-    # retention, and deletion. Historical shared backups are intentionally left
-    # untouched but are not a privileged restore source.
-    return [BACKUP_DIR]
+    return _backup_manager.backup_roots(_backup_runtime())
 
 
 def list_backups() -> list[dict[str, Any]]:
-    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    result = []
-    paths: list[Path] = []
-    for root in _backup_roots():
-        paths.extend(p for p in root.iterdir() if p.is_dir())
-    for path in sorted(paths, key=lambda p: p.name, reverse=True):
-        meta: dict[str, Any] = {}
-        try: meta = json.loads((path / "backup.json").read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError): pass
-        result.append({
-            "name": path.name,
-            "path": str(path),
-            "legacy_location": path.parent == LEGACY_BACKUP_DIR,
-            "created_at": meta.get("created_at"),
-            "version": meta.get("installed_version"),
-            "contents": meta.get("contents") or backup_contents(path),
-            "discovery_configuration_saved": bool(meta.get("discovery_configuration_saved")),
-            "configured_switches": int(meta.get("configured_switches") or 0),
-            "snmp2mqtt_configuration_saved": bool(meta.get("snmp2mqtt_configuration_saved")),
-            "unifi2mqtt_configuration_saved": bool(meta.get("unifi2mqtt_configuration_saved")),
-            "unifi2mqtt_configuration_skipped_unconfigured": bool(meta.get("unifi2mqtt_configuration_skipped_unconfigured")),
-            "snmp2mqtt_generated_yaml_saved": bool(meta.get("snmp2mqtt_generated_yaml_saved")),
-        })
-    return result
+    return _backup_manager.list_backups(_backup_runtime())
 
 
 def _safe_backup_path(name: str) -> Path:
-    if not name or Path(name).name != name:
-        raise RuntimeError("Invalid backup name.")
-    for root in _backup_roots():
-        path = (root / name).resolve()
-        resolved_root = root.resolve()
-        if resolved_root in path.parents and path.is_dir():
-            return path
-    raise RuntimeError("Backup not found.")
+    return _backup_manager.safe_backup_path(_backup_runtime(), name)
 
 
 def delete_backup(name: str) -> dict[str, Any]:
-    path = _safe_backup_path(name); shutil.rmtree(path)
-    return {"ok": True, "deleted": name}
+    return _backup_manager.delete_backup(_backup_runtime(), name)
 
 
-REPLACE_TRANSACTION_SUFFIX = ".switch-vision-replace.json"
+REPLACE_TRANSACTION_SUFFIX = _tree_transaction.REPLACE_TRANSACTION_SUFFIX
 
 
 def _remove_tree_path(path: Path) -> None:
-    if path.is_symlink() or path.is_file():
-        path.unlink()
-    elif path.exists():
-        shutil.rmtree(path)
+    return _tree_transaction.remove_tree_path(path)
 
 
 def _fsync_directory(path: Path) -> None:
-    flags = os.O_RDONLY
-    if hasattr(os, "O_DIRECTORY"):
-        flags |= os.O_DIRECTORY
-    try:
-        fd = os.open(path, flags)
-    except OSError:
-        return
-    try:
-        os.fsync(fd)
-    finally:
-        os.close(fd)
+    return _tree_transaction.fsync_directory(path)
 
 
 def _replacement_marker_path(destination: Path) -> Path:
-    return destination.parent / (
-        f".{destination.name}{REPLACE_TRANSACTION_SUFFIX}"
-    )
+    return _tree_transaction.replacement_marker_path(destination)
 
 
 def _validated_transaction_path(
@@ -1676,26 +1454,11 @@ def _validated_transaction_path(
     value: Any,
     kind: str,
 ) -> Path:
-    parent = destination.parent.resolve()
-    candidate = Path(str(value or ""))
-    if not candidate.is_absolute():
-        candidate = destination.parent / candidate
-    try:
-        candidate_parent = candidate.parent.resolve()
-    except OSError as exc:
-        raise RuntimeError(
-            f"Interrupted replacement {kind} path is invalid: {candidate}"
-        ) from exc
-    expected_prefix = f".{destination.name}.switch-vision-{kind}-"
-    if (
-        candidate_parent != parent
-        or not candidate.name.startswith(expected_prefix)
-    ):
-        raise RuntimeError(
-            f"Interrupted replacement {kind} path is outside the expected "
-            f"destination directory: {candidate}"
-        )
-    return candidate
+    return _tree_transaction.validated_transaction_path(
+        destination,
+        value,
+        kind,
+    )
 
 
 def _write_replace_transaction(
@@ -1704,110 +1467,40 @@ def _write_replace_transaction(
     previous: Path,
     had_destination: bool,
 ) -> Path:
-    marker = _replacement_marker_path(destination)
-    payload = {
-        "schema": 1,
-        "destination": str(destination),
-        "stage": str(stage),
-        "previous": str(previous),
-        "had_destination": bool(had_destination),
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-    temp = marker.parent / f".{marker.name}.{os.getpid()}.tmp"
-    try:
-        with temp.open("w", encoding="utf-8") as handle:
-            json.dump(payload, handle, indent=2)
-            handle.write("\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        temp.chmod(0o600)
-        os.replace(temp, marker)
-        _fsync_directory(marker.parent)
-    finally:
-        if temp.exists():
-            temp.unlink()
-    return marker
+    return _tree_transaction.write_replace_transaction(
+        destination,
+        stage,
+        previous,
+        had_destination,
+        marker_path_func=_replacement_marker_path,
+        fsync_func=_fsync_directory,
+    )
 
 
-def _load_replace_transaction(destination: Path) -> tuple[Path, Path, Path, bool] | None:
-    marker = _replacement_marker_path(destination)
-    if not marker.exists():
-        return None
-    if marker.is_symlink() or not marker.is_file():
-        raise RuntimeError(
-            f"Interrupted replacement marker is not a regular file: {marker}"
-        )
-    try:
-        payload = json.loads(marker.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise RuntimeError(
-            f"Interrupted replacement marker is unreadable: {marker}"
-        ) from exc
-    if not isinstance(payload, dict) or payload.get("schema") != 1:
-        raise RuntimeError(
-            f"Interrupted replacement marker has an unsupported schema: {marker}"
-        )
-    recorded_destination = Path(str(payload.get("destination") or ""))
-    if recorded_destination != destination:
-        raise RuntimeError(
-            "Interrupted replacement marker destination does not match "
-            f"{destination}: {recorded_destination}"
-        )
-    stage = _validated_transaction_path(
-        destination, payload.get("stage"), "stage"
+def _load_replace_transaction(
+    destination: Path,
+) -> tuple[Path, Path, Path, bool] | None:
+    return _tree_transaction.load_replace_transaction(
+        destination,
+        marker_path_func=_replacement_marker_path,
+        validate_path_func=_validated_transaction_path,
     )
-    previous = _validated_transaction_path(
-        destination, payload.get("previous"), "previous"
-    )
-    return marker, stage, previous, bool(payload.get("had_destination"))
 
 
 def recover_interrupted_tree_replacement(destination: Path) -> bool:
-    transaction = _load_replace_transaction(destination)
-    if transaction is None:
-        return False
-    marker, stage, previous, had_destination = transaction
-
-    if destination.is_symlink():
-        raise RuntimeError(
-            f"Refusing to recover replacement over symbolic link: {destination}"
-        )
-    if stage.is_symlink() or previous.is_symlink():
-        raise RuntimeError(
-            "Interrupted replacement contains an unexpected symbolic link."
-        )
-
-    if destination.exists():
-        _remove_tree_path(previous)
-        _remove_tree_path(stage)
-    elif previous.exists():
-        os.replace(previous, destination)
-        _fsync_directory(destination.parent)
-        _remove_tree_path(stage)
-    elif stage.exists() and not had_destination:
-        os.replace(stage, destination)
-        _fsync_directory(destination.parent)
-    elif stage.exists():
-        raise RuntimeError(
-            f"Interrupted replacement for {destination} lost its previous tree."
-        )
-    elif had_destination:
-        raise RuntimeError(
-            f"Interrupted replacement for {destination} cannot recover the "
-            "previous installation."
-        )
-
-    marker.unlink(missing_ok=True)
-    _fsync_directory(destination.parent)
-    return True
+    return _tree_transaction.recover_interrupted_tree_replacement(
+        destination,
+        load_transaction_func=_load_replace_transaction,
+        remove_tree_func=_remove_tree_path,
+        fsync_func=_fsync_directory,
+    )
 
 
 def recover_interrupted_tree_replacements() -> list[str]:
-    recovered: list[str] = []
-    for destination in (COMPONENT_DIR, FRONTEND_DIR):
-        if recover_interrupted_tree_replacement(destination):
-            recovered.append(str(destination))
-    return recovered
+    return _tree_transaction.recover_interrupted_tree_replacements(
+        (COMPONENT_DIR, FRONTEND_DIR),
+        recover_func=recover_interrupted_tree_replacement,
+    )
 
 
 def _rollback_tree_replacement(
@@ -1816,267 +1509,67 @@ def _rollback_tree_replacement(
     previous: Path,
     had_destination: bool,
 ) -> None:
-    if previous.exists():
-        if destination.exists():
-            if stage.exists():
-                _remove_tree_path(stage)
-            os.replace(destination, stage)
-            _fsync_directory(destination.parent)
-        os.replace(previous, destination)
-        _fsync_directory(destination.parent)
-        _remove_tree_path(stage)
-    elif not had_destination and destination.exists():
-        if stage.exists():
-            _remove_tree_path(stage)
-        os.replace(destination, stage)
-        _fsync_directory(destination.parent)
-        _remove_tree_path(stage)
-    else:
-        _remove_tree_path(stage)
-
-    marker = _replacement_marker_path(destination)
-    marker.unlink(missing_ok=True)
-    _fsync_directory(destination.parent)
-
-
-def replace_tree(source: Path, destination: Path) -> None:
-    if not source.is_dir():
-        raise RuntimeError(f"Replacement source is not a directory: {source}")
-    if destination.is_symlink():
-        raise RuntimeError(
-            f"Refusing to replace symbolic-link destination: {destination}"
-        )
-
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    recover_interrupted_tree_replacement(destination)
-
-    token = f"{os.getpid()}-{time.monotonic_ns()}"
-    stage = destination.parent / (
-        f".{destination.name}.switch-vision-stage-{token}"
-    )
-    previous = destination.parent / (
-        f".{destination.name}.switch-vision-previous-{token}"
-    )
-    had_destination = destination.exists()
-
-    try:
-        shutil.copytree(source, stage)
-    except Exception:
-        _remove_tree_path(stage)
-        raise
-
-    marker = _write_replace_transaction(
+    return _tree_transaction.rollback_tree_replacement(
         destination,
         stage,
         previous,
         had_destination,
+        remove_tree_func=_remove_tree_path,
+        marker_path_func=_replacement_marker_path,
+        fsync_func=_fsync_directory,
     )
 
-    try:
-        if had_destination:
-            os.replace(destination, previous)
-            _fsync_directory(destination.parent)
 
-        os.replace(stage, destination)
-        _fsync_directory(destination.parent)
-
-        _remove_tree_path(previous)
-        marker.unlink(missing_ok=True)
-        _fsync_directory(destination.parent)
-    except Exception as exc:
-        try:
-            _rollback_tree_replacement(
-                destination,
-                stage,
-                previous,
-                had_destination,
-            )
-        except Exception as rollback_exc:
-            raise RuntimeError(
-                f"Atomic replacement failed for {destination}: {exc}. "
-                "The durable recovery marker was preserved because automatic "
-                f"rollback also failed: {rollback_exc}"
-            ) from exc
-        raise
+def replace_tree(source: Path, destination: Path) -> None:
+    return _tree_transaction.replace_tree(
+        source,
+        destination,
+        recover_func=recover_interrupted_tree_replacement,
+        remove_tree_func=_remove_tree_path,
+        write_transaction_func=_write_replace_transaction,
+        rollback_func=_rollback_tree_replacement,
+        fsync_func=_fsync_directory,
+    )
 
 
-def _restore_backup_contents(name: str, progress: Progress | None = None) -> dict[str, Any]:
-    backup = _safe_backup_path(name)
-    validate_backup(backup)
-    restored: list[str] = []
-    skipped: list[str] = []
-    mappings = [
-        (backup / "custom_components/switch_vision", COMPONENT_DIR, "Custom component"),
-        (backup / "www/switch-vision", FRONTEND_DIR, "Dashboard frontend"),
-    ]
-    for idx, (source, destination, label) in enumerate(mappings, start=1):
-        if source.is_dir():
-            if progress: progress(f"Restoring {label}…", 20 + idx * 18)
-            replace_tree(source, destination); restored.append(label)
-    discovery_options_file = backup / "discovery-options.json"
-    if discovery_options_file.is_file():
-        options = json.loads(discovery_options_file.read_text(encoding="utf-8"))
-        if isinstance(options, dict):
-            if progress: progress("Restoring Discovery configuration…", 82)
-            set_discovery_options(options)
-            restored.append(f"Discovery configuration ({configured_switch_count(options)} switches)")
-    snmp2mqtt_options_file = backup / "snmp2mqtt-options.json"
-    if snmp2mqtt_options_file.is_file():
-        options = json.loads(snmp2mqtt_options_file.read_text(encoding="utf-8"))
-        if isinstance(options, dict):
-            if progress: progress("Restoring SNMP2MQTT configuration…", 86)
-            set_snmp2mqtt_options(options)
-            restored.append("SNMP2MQTT configuration")
-    unifi2mqtt_options_file = backup / "unifi2mqtt-options.json"
-    if unifi2mqtt_options_file.is_file():
-        options = json.loads(unifi2mqtt_options_file.read_text(encoding="utf-8"))
-        if isinstance(options, dict):
-            if unifi2mqtt_options_configured(options):
-                if progress: progress("Restoring UniFi2MQTT configuration…", 90)
-                set_unifi2mqtt_options(options)
-                restored.append("UniFi2MQTT configuration")
-            else:
-                skipped.append("UniFi2MQTT configuration (backup contains unconfigured defaults)")
-    generated_yaml = backup / "share" / "switch_vision" / "generated-snmp2mqtt.yaml"
-    if generated_yaml.is_file():
-        GENERATED_SNMP2MQTT_YAML.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(generated_yaml, GENERATED_SNMP2MQTT_YAML)
-        restored.append("Generated SNMP2MQTT YAML")
-    storage = backup / ".storage" / "switch_vision_calibrations"
-    if storage.is_file():
-        target = HA_CONFIG / ".storage" / storage.name; target.parent.mkdir(parents=True, exist_ok=True); shutil.copy2(storage, target); restored.append("Calibration storage")
-    if not restored: raise RuntimeError("The selected backup contains no restorable Switch Vision components.")
-    actions = []
-    if "Custom component" in restored: actions.append("Restart Home Assistant Core")
-    if any(item.startswith("Discovery configuration") for item in restored): actions.append("Restart Switch Vision Discovery")
-    if "SNMP2MQTT configuration" in restored or "Generated SNMP2MQTT YAML" in restored: actions.append("Restart Switch Vision SNMP2MQTT")
-    if "UniFi2MQTT configuration" in restored: actions.append("Restart Switch Vision UniFi2MQTT if it is running")
-    if "Dashboard frontend" in restored: actions.append("Hard-refresh the browser")
-    return {"ok": True, "backup": name, "restored": restored, "skipped": skipped, "required_actions": actions, "completed_at": datetime.now(timezone.utc).isoformat()}
+def _restore_backup_contents(
+    name: str,
+    progress: Progress | None = None,
+) -> dict[str, Any]:
+    return _backup_manager.restore_backup_contents(
+        _backup_runtime(),
+        name,
+        progress,
+    )
 
 
 def _capture_restore_snapshot(path: Path) -> dict[str, Any]:
-    path.mkdir(parents=True, exist_ok=True)
-    path.chmod(0o700)
-    meta = {
-        "component_present": COMPONENT_DIR.is_dir(),
-        "frontend_present": FRONTEND_DIR.is_dir(),
-        "generated_yaml_present": GENERATED_SNMP2MQTT_YAML.is_file(),
-        "calibration_present": (
-            HA_CONFIG / ".storage" / "switch_vision_calibrations"
-        ).is_file(),
-    }
-    copy_backup(COMPONENT_DIR, path, "custom_components/switch_vision")
-    copy_backup(FRONTEND_DIR, path, "www/switch-vision")
-
-    for filename, getter, status_getter, label in (
-        (
-            "discovery-options.json",
-            get_discovery_options,
-            discovery_status,
-            "Discovery",
-        ),
-        (
-            "snmp2mqtt-options.json",
-            get_snmp2mqtt_options,
-            snmp2mqtt_status,
-            "SNMP2MQTT",
-        ),
-        (
-            "unifi2mqtt-options.json",
-            get_unifi2mqtt_options,
-            unifi2mqtt_status,
-            "UniFi2MQTT",
-        ),
-    ):
-        status = status_getter()
-        installed = bool(status.get("installed")) if isinstance(status, dict) else False
-        options = getter()
-        if installed and not isinstance(options, dict):
-            raise RuntimeError(
-                f"Cannot start transactional restore because current {label} "
-                "options could not be captured safely."
-            )
-        if isinstance(options, dict):
-            (path / filename).write_text(
-                json.dumps(options, indent=2) + "\n", encoding="utf-8"
-            )
-
-    if GENERATED_SNMP2MQTT_YAML.is_file():
-        target = path / "share" / "switch_vision" / GENERATED_SNMP2MQTT_YAML.name
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(GENERATED_SNMP2MQTT_YAML, target)
-
-    calibration = HA_CONFIG / ".storage" / "switch_vision_calibrations"
-    if calibration.is_file():
-        target = path / ".storage" / calibration.name
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(calibration, target)
-
-    secure_backup_permissions(path)
-    return meta
+    return _backup_manager.capture_restore_snapshot(
+        _backup_runtime(),
+        path,
+    )
 
 
-def _rollback_restore_snapshot(path: Path, meta: dict[str, Any]) -> None:
-    for present_key, source, destination in (
-        ("component_present", path / "custom_components" / "switch_vision", COMPONENT_DIR),
-        ("frontend_present", path / "www" / "switch-vision", FRONTEND_DIR),
-    ):
-        if meta.get(present_key) and source.is_dir():
-            replace_tree(source, destination)
-        elif not meta.get(present_key) and destination.exists():
-            shutil.rmtree(destination)
-
-    for filename, setter in (
-        ("discovery-options.json", lambda value: set_discovery_options(value)),
-        ("snmp2mqtt-options.json", set_snmp2mqtt_options),
-        ("unifi2mqtt-options.json", set_unifi2mqtt_options),
-    ):
-        source = path / filename
-        if source.is_file():
-            value = json.loads(source.read_text(encoding="utf-8"))
-            if isinstance(value, dict):
-                setter(value)
-
-    snapshot_yaml = path / "share" / "switch_vision" / "generated-snmp2mqtt.yaml"
-    if meta.get("generated_yaml_present") and snapshot_yaml.is_file():
-        GENERATED_SNMP2MQTT_YAML.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(snapshot_yaml, GENERATED_SNMP2MQTT_YAML)
-    elif not meta.get("generated_yaml_present") and GENERATED_SNMP2MQTT_YAML.exists():
-        GENERATED_SNMP2MQTT_YAML.unlink()
-
-    calibration = HA_CONFIG / ".storage" / "switch_vision_calibrations"
-    snapshot_calibration = path / ".storage" / "switch_vision_calibrations"
-    if meta.get("calibration_present") and snapshot_calibration.is_file():
-        calibration.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(snapshot_calibration, calibration)
-    elif not meta.get("calibration_present") and calibration.exists():
-        calibration.unlink()
+def _rollback_restore_snapshot(
+    path: Path,
+    meta: dict[str, Any],
+) -> None:
+    return _backup_manager.rollback_restore_snapshot(
+        _backup_runtime(),
+        path,
+        meta,
+    )
 
 
-def restore_backup(name: str, progress: Progress | None = None) -> dict[str, Any]:
-    backup = _safe_backup_path(name)
-    validate_backup(backup)
-    WORK_DIR.mkdir(parents=True, exist_ok=True)
-    safety = Path(tempfile.mkdtemp(prefix="restore-safety-", dir=WORK_DIR))
-    meta = _capture_restore_snapshot(safety)
-    try:
-        result = _restore_backup_contents(name, progress)
-        result["transactional_restore"] = True
-        return result
-    except Exception as exc:
-        try:
-            _rollback_restore_snapshot(safety, meta)
-        except Exception as rollback_exc:
-            raise RuntimeError(
-                f"Restore failed: {exc}. Automatic safety rollback also failed: {rollback_exc}"
-            ) from exc
-        raise RuntimeError(
-            f"Restore failed: {exc}. Previous files/settings were restored from "
-            "the temporary safety snapshot."
-        ) from exc
-    finally:
-        shutil.rmtree(safety, ignore_errors=True)
+def restore_backup(
+    name: str,
+    progress: Progress | None = None,
+) -> dict[str, Any]:
+    return _backup_manager.restore_backup(
+        _backup_runtime(),
+        name,
+        progress,
+    )
 
 
 def collect_custom_assets() -> dict[str, dict[str, bytes]]:

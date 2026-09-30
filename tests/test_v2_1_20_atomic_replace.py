@@ -9,6 +9,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 INSTALLER = ROOT / "switch_vision_installer" / "app" / "installer.py"
+TREE_TRANSACTION = ROOT / "switch_vision_installer" / "app" / "tree_transaction.py"
 
 spec = importlib.util.spec_from_file_location(
     "sv_installer_v220_atomic_test",
@@ -178,14 +179,15 @@ with tempfile.TemporaryDirectory() as td:
 
 
 source = INSTALLER.read_text(encoding="utf-8")
-replace_start = source.index("def replace_tree(")
-replace_end = source.index("\n\ndef _restore_backup_contents", replace_start)
-replace_source = source[replace_start:replace_end]
+transaction_source = TREE_TRANSACTION.read_text(encoding="utf-8")
+replace_start = transaction_source.index("def replace_tree(")
+replace_source = transaction_source[replace_start:]
 
 assert "shutil.rmtree(destination)" not in replace_source
-assert "recover_interrupted_tree_replacement(destination)" in replace_source
-assert "_write_replace_transaction" in source
+assert "recover_func(destination)" in replace_source
+assert "def write_replace_transaction" in transaction_source
 assert "os.replace(stage, destination)" in replace_source
-assert "recover_interrupted_tree_replacements" in source
+assert "def recover_interrupted_tree_replacements" in transaction_source
+assert "import tree_transaction as _tree_transaction" in source
 
 print("Switch Vision Installer v2.1.20 crash-atomic replacement regression: PASS")

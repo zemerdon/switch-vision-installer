@@ -9,6 +9,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 INSTALLER = ROOT / "switch_vision_installer" / "app" / "installer.py"
+BACKUP_MANAGER = ROOT / "switch_vision_installer" / "app" / "backup_manager.py"
 INSTALLER_JS = ROOT / "switch_vision_installer" / "www" / "installer.js"
 
 spec = importlib.util.spec_from_file_location("sv_installer_backup_test", INSTALLER)
@@ -60,6 +61,7 @@ assert mod.configured_switch_count({"devices": [{"name": "legacy"}]}) == 1
 
 
 source = INSTALLER.read_text(encoding="utf-8")
+backup_source = BACKUP_MANAGER.read_text(encoding="utf-8")
 web_source = INSTALLER_JS.read_text(encoding="utf-8")
 web_py_source = (
     ROOT / "switch_vision_installer" / "app" / "web.py"
@@ -70,8 +72,14 @@ assert "Components that are already current will be left unchanged." in web_py_s
 assert "check Home Assistant " in web_py_source
 assert "Supervisor logs for details." in web_py_source
 assert "Original error: " in web_py_source
-create_section = source[source.index("def create_backup("):source.index("def create_manual_backup(")]
-restore_section = source[source.index("def _restore_backup_contents("):source.index("def collect_custom_assets(")]
+create_section = backup_source[
+    backup_source.index("def create_backup("):
+    backup_source.index("def create_manual_backup(")
+]
+restore_section = backup_source[
+    backup_source.index("def restore_backup_contents("):
+    backup_source.index("def capture_restore_snapshot(")
+]
 
 assert 'copy_backup(DISCOVERY_DIR' not in create_section
 assert 'copy_backup(SNMP2MQTT_DIR' not in create_section
@@ -80,13 +88,13 @@ assert 'unifi2mqtt_options_configured' in create_section
 assert 'addons/switch_vision_snmp2mqtt' not in restore_section
 assert 'unifi2mqtt_options_configured' in restore_section
 assert 'Restart Switch Vision Discovery' in restore_section
-assert 'mappings.append((release_snmp2mqtt, SNMP2MQTT_DIR, "SNMP2MQTT add-on"))' not in source
+assert 'mappings.append((release_snmp2mqtt, SNMP2MQTT_DIR, "SNMP2MQTT add-on"))' not in backup_source
 
 assert "skipped=(r.skipped||[])" in web_source
 assert "<b>Skipped safely:</b>" in web_source
 # Backup metadata remains authoritative in the backend/Maintenance bridge even
 # though the duplicate Installer backup UI was removed in v2.1.39.
-assert "unifi2mqtt_configuration_skipped_unconfigured" in source
+assert "unifi2mqtt_configuration_skipped_unconfigured" in backup_source
 assert "unifi2mqtt_configuration_skipped_unconfigured" in (
     ROOT / "switch_vision_installer" / "app" / "web_manager.py"
 ).read_text(encoding="utf-8")
