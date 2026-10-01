@@ -51,4 +51,4 @@ The main release ZIP no longer needs to package Discovery, SNMP2MQTT, or UniFi2M
 
 ## UI preferences
 
-The Installer reads density, text-size, and content-width preferences from `/share/switch_vision/ui-preferences.json`. Configure these values through the Switch Vision integration options.
+The Installer reads density, text-size, content-width, and the selected shared management theme from `/share/switch_vision/ui-preferences.json`. Configure density/size/width through Switch Vision settings and build/select named custom themes from **Switch Vision Settings → Custom Theme** in Discovery / Hub. The same sanitized palette is applied across Discovery and Installer; dashboard/card/faceplate presentation is unaffected.

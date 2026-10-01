@@ -18,6 +18,19 @@ UI_TEXT_SIZE_MAX_PX = 20
 UI_TEXT_SIZE_DEFAULT_PX = 16
 UI_TEXT_SIZE_LEGACY = {"normal": 16, "small": 14}
 UI_DEFAULTS = {"density": "comfortable", "text_size": UI_TEXT_SIZE_DEFAULT_PX, "content_width": "standard"}
+MANAGEMENT_BUILTIN_THEME_IDS = {"switch-vision", "cisco-classic", "cisco-nexus", "unifi"}
+MANAGEMENT_THEME_COLOR_KEYS = (
+    "page", "card", "card_strong", "surface_input", "surface_button",
+    "surface_inset", "surface_hover", "text", "muted", "field_label",
+    "line", "line_soft", "accent", "accent_strong", "accent_dark",
+    "accent_dark_hover", "accent_soft", "heading", "heading_strong",
+    "heading_line", "heading_soft", "heading_glow", "warn", "warn_soft",
+    "ok", "ok_soft", "bad", "bad_soft", "neutral_soft", "on_accent",
+    "on_primary", "shadow", "status_bg", "code_bg", "chip_bg", "chip_hover",
+    "heart", "link", "link_hover", "button_primary_bg", "button_primary_text",
+    "button_secondary_bg", "button_secondary_text", "button_danger_bg",
+    "button_danger_text",
+)
 UI_ALLOWED = {
     "density": {"spacious", "comfortable", "compact", "dense", "ultra_dense"},
     "content_width": {
@@ -58,9 +71,60 @@ class RequestBodyError(RuntimeError):
         self.status = status
 
 
-def installer_ui_preferences() -> dict[str, str]:
+def _safe_management_theme(document: object) -> dict[str, object]:
+    """Return one browser-safe shared management-theme contract."""
+    fallback: dict[str, object] = {"selected": "switch-vision", "custom_themes": []}
+    if not isinstance(document, dict):
+        return fallback
+    raw = document.get("management_theme")
+    if not isinstance(raw, dict):
+        return fallback
+    raw_themes = raw.get("custom_themes")
+    if not isinstance(raw_themes, list) or len(raw_themes) > 20:
+        return fallback
+    themes: list[dict[str, object]] = []
+    ids: set[str] = set()
+    for item in raw_themes:
+        if not isinstance(item, dict):
+            return fallback
+        theme_id = str(item.get("id") or "")
+        name = str(item.get("name") or "")
+        colors = item.get("colors")
+        if (
+            not theme_id
+            or len(theme_id) > 64
+            or any(ch not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-" for ch in theme_id)
+            or theme_id in ids
+            or not name
+            or len(name) > 64
+            or any(not ch.isprintable() or ch in '<>&"' for ch in name)
+            or not isinstance(colors, dict)
+            or set(colors) != set(MANAGEMENT_THEME_COLOR_KEYS)
+        ):
+            return fallback
+        safe_colors: dict[str, str] = {}
+        for key in MANAGEMENT_THEME_COLOR_KEYS:
+            color = str(colors.get(key) or "").strip().lower()
+            if (
+                len(color) != 7
+                or not color.startswith("#")
+                or any(ch not in "0123456789abcdef" for ch in color[1:])
+            ):
+                return fallback
+            safe_colors[key] = color
+        ids.add(theme_id)
+        themes.append({"id": theme_id, "name": name, "colors": safe_colors})
+    selected = str(raw.get("selected") or "switch-vision")
+    if selected not in MANAGEMENT_BUILTIN_THEME_IDS:
+        if not selected.startswith("custom:") or selected.split(":", 1)[1] not in ids:
+            selected = "switch-vision"
+    return {"selected": selected, "custom_themes": themes}
+
+
+def installer_ui_preferences() -> dict[str, object]:
     """Read and validate shared Switch Vision Installer UI preferences."""
-    values = dict(UI_DEFAULTS)
+    values: dict[str, object] = dict(UI_DEFAULTS)
+    values["management_theme"] = {"selected": "switch-vision", "custom_themes": []}
     try:
         document = json.loads(UI_PREFERENCES_PATH.read_text(encoding="utf-8"))
         installer = document.get("installer", {}) if isinstance(document, dict) else {}
@@ -72,6 +136,7 @@ def installer_ui_preferences() -> dict[str, str]:
             values["text_size"] = normalise_ui_text_size(
                 installer.get("text_size", values["text_size"])
             )
+        values["management_theme"] = _safe_management_theme(document)
     except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         pass
     return values

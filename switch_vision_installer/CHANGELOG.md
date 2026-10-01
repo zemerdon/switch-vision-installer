@@ -1,3 +1,12 @@
+## v2.1.44 — Shared custom management themes
+
+- Consume Core UI-preferences schema version 2 and the selected shared management-theme contract.
+- Apply the selected built-in or named custom theme across the complete Installer UI using the same 45 colour roles as Discovery / Hub.
+- Replace fixed Installer and component-manager colours with shared semantic CSS variables for page/card/input/button/text/border/heading/status/link/chip/code surfaces.
+- Validate custom theme ids, names, complete colour-role coverage, and `#rrggbb` values before exposing the palette to the browser; malformed shared state fails safely to Switch Vision.
+- Preserve the existing density, text-size, and content-width behavior independently of colour theming.
+- Add regression coverage proving Installer has no fixed UI colours outside its default palette and consumes the same Core-owned theme contract.
+
 ## v2.1.43 — Reliable serialized App Store refresh
 
 - Serialize Home Assistant App Store refreshes through one authoritative `/store/reload` request instead of back-to-back add-on/store reload calls that can overlap long Supervisor repository updates.

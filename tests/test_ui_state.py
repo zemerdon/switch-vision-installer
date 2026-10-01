@@ -67,6 +67,60 @@ assert "function normaliseUiTextSize(raw)" in installer_js
 assert "document.body.style.setProperty('--sv-body',`${values.text_size}px`)" in installer_js
 assert 'body.text-small{' not in (WWW / 'installer.css').read_text(encoding='utf-8')
 
+# Shared management-theme contract is read from Core's ui-preferences.json and
+# applied to every Installer colour surface through role-based CSS variables.
+css = (WWW / 'installer.css').read_text(encoding='utf-8')
+for marker in (
+    'MANAGEMENT_THEME_COLOR_KEYS = (',
+    'def _safe_management_theme(document: object)',
+    'values["management_theme"] = _safe_management_theme(document)',
+    'const MANAGEMENT_THEME_KEYS=',
+    'const BUILTIN_THEME_PALETTES=',
+    'function applyManagementTheme(raw={})',
+    'applyManagementTheme(raw?.management_theme||{})',
+    "window.addEventListener('focus',()=>loadUiPreferences())",
+    "document.addEventListener('visibilitychange',()=>{if(!document.hidden)loadUiPreferences();})",
+):
+    assert marker in web or marker in installer_js, marker
+
+theme_roles = (
+    '--page:', '--card:', '--surface-input:', '--surface-button:', '--text:',
+    '--muted:', '--field-label:', '--line:', '--accent:', '--heading:',
+    '--warn:', '--ok:', '--bad:', '--link:', '--button-primary-bg:',
+    '--button-secondary-bg:', '--button-danger-bg:',
+)
+for marker in theme_roles:
+    assert marker in css, marker
+
+# UI rules outside the root default palette must use variables instead of
+# retaining fixed colours that would ignore the selected shared theme.
+css_without_root = re.sub(r':root\{.*?\}\n', '', css, count=1, flags=re.S)
+assert not re.search(r'#[0-9a-fA-F]{3,8}', css_without_root)
+component_css = (WWW / 'component-manager.css').read_text(encoding='utf-8')
+assert not re.search(r'#[0-9a-fA-F]{3,8}', component_css)
+
+theme_key_node = next(
+    node for node in web_tree.body
+    if isinstance(node, ast.Assign)
+    and any(isinstance(target, ast.Name) and target.id == 'MANAGEMENT_THEME_COLOR_KEYS' for target in node.targets)
+)
+theme_keys = ast.literal_eval(theme_key_node.value)
+safe_theme_helper = next(
+    node for node in web_tree.body
+    if isinstance(node, ast.FunctionDef) and node.name == '_safe_management_theme'
+)
+theme_ns = {
+    'MANAGEMENT_THEME_COLOR_KEYS': theme_keys,
+    'MANAGEMENT_BUILTIN_THEME_IDS': {'switch-vision','cisco-classic','cisco-nexus','unifi'},
+}
+exec(compile(ast.Module(body=[safe_theme_helper], type_ignores=[]), '<installer-theme>', 'exec'), theme_ns)
+safe_theme = theme_ns['_safe_management_theme']
+colors = {key:'#123456' for key in theme_keys}
+document = {'management_theme': {'selected':'custom:lab', 'custom_themes':[{'id':'lab','name':'Lab Theme','colors':colors}]}}
+assert safe_theme(document) == document['management_theme']
+assert safe_theme({'management_theme': {'selected':'custom:missing','custom_themes':[]}})['selected'] == 'switch-vision'
+assert safe_theme({'management_theme': {'selected':'custom:lab','custom_themes':[{'id':'bad/id','name':'Bad','colors':colors}]}}) == {'selected':'switch-vision','custom_themes':[]}
+
 
 # Shared 5-point density and 10-point width contract consumed from Core.
 css = (WWW / 'installer.css').read_text(encoding='utf-8')
