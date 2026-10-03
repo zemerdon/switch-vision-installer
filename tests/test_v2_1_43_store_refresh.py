@@ -7,7 +7,7 @@ APP = ROOT / "switch_vision_installer" / "app"
 CONFIG = (ROOT / "switch_vision_installer/config.yaml").read_text(encoding="utf-8")
 CHANGELOG = (ROOT / "switch_vision_installer/CHANGELOG.md").read_text(encoding="utf-8")
 
-assert 'version: "2.1.44"' in CONFIG
+assert 'version: "2.1.45"' in CONFIG
 assert "## v2.1.43 — Reliable serialized App Store refresh" in CHANGELOG
 
 spec = importlib.util.spec_from_file_location("sv_installer_2143", APP / "installer.py")

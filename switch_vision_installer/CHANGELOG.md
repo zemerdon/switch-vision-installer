@@ -1,3 +1,9 @@
+## v2.1.45 — Product-owned local release validation
+
+- Add the product-owned local-first release gate at `tools/sv_release_check.py --mode release` and a permanent gate regression.
+- Validate exact Installer version metadata, Docker digest/build-version projection, Python/shell syntax, source hygiene, and every maintained Installer regression in isolated fresh Python processes while proving the repository state is unchanged.
+- Keep Installer runtime/install/update/backup/recovery behavior unchanged; this patch establishes deterministic release-check parity for the unified Switch Vision release workflow.
+
 ## v2.1.44 — Shared custom management themes
 
 - Consume Core UI-preferences schema version 2 and the selected shared management-theme contract.
