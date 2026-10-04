@@ -1,3 +1,9 @@
+## v2.1.46 — Guarded source publication parity
+
+- Add the one-shot `.sv-release-request.json` publisher for Installer so public `main` can be projected from exact canonical local source under the same guarded release transaction as the other maintained families.
+- Run the product-owned Installer release check against the exact target SHA inside the publisher, require exact semantic-version agreement, same-repository PR provenance, immutable target/base identity, read-only workflow permissions, and a full-SHA pinned checkout action.
+- Keep Installer runtime, install/update, backup/recovery and Supervisor behavior unchanged; the public Git repository remains the product artifact and no synthetic image/release asset is introduced.
+
 ## v2.1.45 — Product-owned local release validation
 
 - Add the product-owned local-first release gate at `tools/sv_release_check.py --mode release` and a permanent gate regression.

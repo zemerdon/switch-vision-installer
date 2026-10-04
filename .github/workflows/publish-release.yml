@@ -1,0 +1,116 @@
+name: Publish Installer Release
+
+on:
+  pull_request:
+    types:
+      - opened
+    branches:
+      - main
+    paths:
+      - .sv-release-request.json
+
+concurrency:
+  group: switch-vision-release-${{ github.repository }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.event.pull_request.head.ref, 'release/installer-')
+    name: Validate exact Installer source publication
+    runs-on: ubuntu-latest
+    env:
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+
+    steps:
+      - name: Checkout release request
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate release request
+        id: request
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f .sv-release-request.json
+
+          mapfile -t changed < <(git diff --name-only "$BASE_SHA...HEAD")
+          if [ "${#changed[@]}" -ne 1 ] || [ "${changed[0]}" != ".sv-release-request.json" ]; then
+            echo 'ERROR: Installer release-request PR must change only .sv-release-request.json'
+            printf 'Changed: %s\n' "${changed[@]}"
+            exit 1
+          fi
+
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          import re
+          from pathlib import Path
+
+          data = json.loads(Path('.sv-release-request.json').read_text(encoding='utf-8'))
+          if set(data) != {'version', 'target_sha', 'publish'}:
+              raise SystemExit('ERROR: release request must contain exactly version,target_sha,publish')
+          version = str(data['version']).strip().lstrip('v')
+          target = str(data['target_sha']).strip()
+          publish = data['publish']
+          if not re.fullmatch(r'\d+\.\d+\.\d+', version):
+              raise SystemExit('ERROR: request.version must be an exact semantic version')
+          if not re.fullmatch(r'[0-9a-f]{40}', target):
+              raise SystemExit('ERROR: request.target_sha must be a full 40-character commit SHA')
+          if not isinstance(publish, bool):
+              raise SystemExit('ERROR: request.publish must be true or false')
+          print(f'version={version}')
+          print(f'target_sha={target}')
+          print(f'publish={str(publish).lower()}')
+          PY
+
+          TARGET_SHA="$(python3 -c 'import json; print(json.load(open(".sv-release-request.json"))["target_sha"])')"
+          git cat-file -e "$TARGET_SHA^{commit}"
+          git merge-base --is-ancestor "$TARGET_SHA" "$BASE_SHA"
+
+          PUBLISH="$(python3 -c 'import json; print(str(bool(json.load(open(".sv-release-request.json")).get("publish", False))).lower())')"
+          if [ "$PUBLISH" = true ] && [ "$TARGET_SHA" != "$BASE_SHA" ]; then
+            echo 'ERROR: publish requests must target the exact projected public main SHA'
+            echo "target=$TARGET_SHA base=$BASE_SHA"
+            exit 1
+          fi
+
+      - name: Checkout exact Installer target
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ steps.request.outputs.target_sha }}
+          persist-credentials: false
+
+      - name: Run product-owned exact release check
+        run: python3 tools/sv_release_check.py --mode release
+
+      - name: Verify exact Installer version metadata
+        env:
+          REQUEST_VERSION: ${{ steps.request.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(awk '$1 == "version:" {gsub(/"/, "", $2); print $2; exit}' switch_vision_installer/config.yaml)"
+          test -n "$version"
+          test "$version" = "$REQUEST_VERSION"
+          test "$(git rev-parse HEAD)" = "${{ steps.request.outputs.target_sha }}"
+
+      - name: Confirm public source publication
+        if: ${{ steps.request.outputs.publish == 'true' }}
+        run: |
+          echo 'Installer public source publication contract: PASS'
+          echo 'version=${{ steps.request.outputs.version }}'
+          echo 'target=${{ steps.request.outputs.target_sha }}'
+
+      - name: Dry-run complete
+        if: ${{ steps.request.outputs.publish != 'true' }}
+        run: |
+          echo 'Installer release workflow DRY RUN: PASS'
+          echo 'version=${{ steps.request.outputs.version }}'
+          echo 'target=${{ steps.request.outputs.target_sha }}'
