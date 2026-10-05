@@ -260,6 +260,7 @@ def find_discovery_slug(include_store: bool = False) -> str:
             or name == "switch vision discovery"
         ),
         include_store=include_store,
+        fail_on_unavailable=True,
     )
     if addon:
         return str(addon.get("slug", ""))
@@ -365,7 +366,7 @@ def reconcile_discovery_repository_app(
         or "switch-vision-discovery" in slug
         or name == "switch vision discovery"
     )
-    installed = _find_addon(match, include_store=False)
+    installed = _find_addon(match, include_store=False, fail_on_unavailable=True)
     installed_slug = str(installed.get("slug") or "") if installed else ""
     preserved_options = get_discovery_options() if installed else None
     migrated = bool(installed_slug and installed_slug != store_slug)
@@ -396,6 +397,7 @@ def reconcile_discovery_repository_app(
     installed_store = _find_addon(
         lambda slug, name: slug == store_slug.lower(),
         include_store=False,
+        fail_on_unavailable=True,
     )
     if not installed_store:
         if progress:
@@ -592,15 +594,24 @@ def configured_switch_count(options: dict[str, Any] | None) -> int:
     return 0
 
 
-def _find_addon(predicate: Callable[[str, str], bool], include_store: bool = False) -> dict[str, Any] | None:
+def _find_addon(
+    predicate: Callable[[str, str], bool],
+    include_store: bool = False,
+    *,
+    fail_on_unavailable: bool = False,
+) -> dict[str, Any] | None:
     endpoints = ["/addons"]
     if include_store:
         endpoints.append("/store")
+    successful_queries = 0
+    last_error: Exception | None = None
     for endpoint in endpoints:
         try:
             payload = supervisor_request(endpoint)
-        except Exception:
+        except Exception as exc:
+            last_error = exc
             continue
+        successful_queries += 1
         data = payload.get("data", {})
         candidates = data.get("addons", []) if isinstance(data, dict) else []
         if not isinstance(candidates, list):
@@ -612,6 +623,8 @@ def _find_addon(predicate: Callable[[str, str], bool], include_store: bool = Fal
             name = str(addon.get("name", ""))
             if predicate(slug.lower(), name.lower()):
                 return addon
+    if fail_on_unavailable and successful_queries == 0:
+        raise RuntimeError("Home Assistant Supervisor app status is unavailable.") from last_error
     return None
 
 
@@ -623,6 +636,7 @@ def discovery_status() -> dict[str, Any]:
             or name == "switch vision discovery"
         ),
         include_store=False,
+        fail_on_unavailable=True,
     )
     store_addon = _find_addon(
         lambda slug, name: (
@@ -669,6 +683,7 @@ def find_snmp2mqtt_slug(include_store: bool = False) -> str:
             or ("switch vision" in name and "snmp2mqtt" in name)
         ),
         include_store=include_store,
+        fail_on_unavailable=True,
     )
     if addon:
         return str(addon.get("slug", ""))
@@ -701,6 +716,7 @@ def snmp2mqtt_status() -> dict[str, Any]:
             or ("switch vision" in name and "snmp2mqtt" in name)
         ),
         include_store=False,
+        fail_on_unavailable=True,
     )
     store_addon = _find_addon(
         lambda slug, name: (
@@ -749,6 +765,7 @@ def find_unifi2mqtt_slug(include_store: bool = False) -> str:
             or ("switch vision" in name and "unifi2mqtt" in name)
         ),
         include_store=include_store,
+        fail_on_unavailable=True,
     )
     if addon:
         return str(addon.get("slug", ""))
@@ -801,7 +818,7 @@ def unifi2mqtt_status() -> dict[str, Any]:
         or name == "switch vision unifi2mqtt"
         or ("switch vision" in name and "unifi2mqtt" in name)
     )
-    installed_addon = _find_addon(match, include_store=False)
+    installed_addon = _find_addon(match, include_store=False, fail_on_unavailable=True)
     store_addon = _find_addon(match, include_store=True)
     if installed_addon:
         slug = str(installed_addon.get("slug", ""))

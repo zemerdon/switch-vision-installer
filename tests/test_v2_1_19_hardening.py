@@ -173,6 +173,7 @@ with tempfile.TemporaryDirectory() as td:
     mod.get_discovery_options = lambda: dict(current_discovery)
     mod.get_snmp2mqtt_options = lambda: dict(current_snmp)
     mod.get_unifi2mqtt_options = lambda: dict(current_unifi)
+    mod.supervisor_request = lambda path, method="GET", payload=None, **kwargs: {"data": {"addons": []}}
 
     captured = {}
     mod.set_discovery_options = lambda options, slug=None: captured.__setitem__(

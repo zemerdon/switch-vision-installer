@@ -1,3 +1,9 @@
+## v2.1.47 — Fail-closed Supervisor app status
+
+- Treat Supervisor app-status lookup failures as unavailable control state instead of silently interpreting them as an app not being installed.
+- Apply the fail-closed lookup to Discovery, SNMP2MQTT and UniFi2MQTT installed/status and repository-reconciliation paths while preserving normal not-installed behavior when Supervisor responds successfully with no matching app.
+- Preserve existing update, reinstall, option/state restoration and public/local release authority behavior.
+
 ## v2.1.46 — Guarded source publication parity
 
 - Add the one-shot `.sv-release-request.json` publisher for Installer so public `main` can be projected from exact canonical local source under the same guarded release transaction as the other maintained families.

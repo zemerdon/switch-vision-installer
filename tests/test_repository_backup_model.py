@@ -159,6 +159,7 @@ with tempfile.TemporaryDirectory() as td:
     mod.get_unifi2mqtt_options = lambda: configured_unifi
     mod.installed_version = lambda: "2.1.2"
     mod.prune_backups = lambda: {"ok": True}
+    mod.supervisor_request = lambda path, method="GET", payload=None, **kwargs: {"data": {"addons": []}}
 
     backup = mod.create_backup(force=True)
     assert backup is not None and backup.is_dir()
