@@ -145,8 +145,8 @@ async function requestComponentRestart(component,label){
   const row=managedComponentSnapshot?.components?.find(item=>item.id===component);
   if(!route||!row||!componentRestartAvailable(row))return;
   const name=component==='core'?'Home Assistant Core':(label||row.label);
-  if(!window.confirm(component==='core'?'Restart Home Assistant Core now?':`Restart ${name} now? The service may be briefly unavailable.`))return;
   const button=document.querySelector(`button.component-restart[data-component="${component}"]`);
+  if(button?.disabled)return;
   if(button)button.disabled=true;
   try{
     await json(route,{method:'POST'});

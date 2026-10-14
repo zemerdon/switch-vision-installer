@@ -11,7 +11,7 @@ INDEX = (WWW / "index.html").read_text(encoding="utf-8")
 CSS = (WWW / "installer.css").read_text(encoding="utf-8")
 JS = (WWW / "installer.js").read_text(encoding="utf-8")
 VERSION = (ROOT / "switch_vision_installer/config.yaml").read_text(encoding="utf-8")
-assert 'version: "2.1.49"' in VERSION
+assert 'version: "2.1.50"' in VERSION
 
 
 class CheckPlacement(HTMLParser):
@@ -51,10 +51,10 @@ for token in (
     "--check-updates-border:#b39ddb",
     "--check-updates-text:#fff",
     ".components-heading{display:flex;justify-content:space-between",
-    ".components-heading .check-updates{flex-shrink:0;",
+    ".components-heading .check-updates{flex:0 0 auto;",
     ".components-heading .check-updates:hover{",
-    ".components-heading{align-items:stretch;flex-direction:column}",
-    ".components-heading .check-updates{width:100%;min-width:0}",
+    ".components-heading{align-items:flex-start;flex-direction:column}",
+    ".components-heading .check-updates{align-self:flex-end;width:auto;min-width:0}",
 ):
     assert token in CSS, token
 
@@ -77,4 +77,4 @@ assert "await refresh(false)" in JS
 assert re.search(r"button:disabled\{opacity:", CSS)
 assert "id=\"system-actions-card\"" not in INDEX
 assert "Core install or reinstall</h2>" not in INDEX
-print("Installer v2.1.49 Components check-update placement/color/routing: PASS")
+print("Installer v2.1.50 Components check-update placement/color/routing: PASS")

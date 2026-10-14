@@ -1,3 +1,8 @@
+## v2.1.50 — Compact Components update-check button
+
+- Match the established compact purple action styling: fit text rather than imposing a large minimum width/height, top-align on desktop, and right-align without stretching on mobile.
+- Remove Restart confirmation popups from component rows while retaining live availability checks, in-flight button disabling and backend restart safeguards. Reinstall confirmations and other component lifecycle behavior remain unchanged.
+
 ## v2.1.49 — Components update-check placement
 
 - Move the existing Check for updates action from the page header to the right side of the Components heading, using a purple high-contrast button and responsive full-width mobile presentation.

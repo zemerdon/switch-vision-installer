@@ -95,11 +95,15 @@ async function main() {
     assert.deepEqual(calls.at(-1), [url, 'POST']);
     assert.equal(buttons['button.component-restart[data-component="' + id + '"]'].disabled, true);
   }
-  assert(confirmations.some(message => message === 'Restart Home Assistant Core now?'));
+  assert.equal(confirmations.length, 0, 'Restart must not show a confirmation popup');
   approve = false;
   const count = calls.length;
   await send('discovery');
-  assert.equal(calls.length, count, 'cancel must not issue a restart');
+  assert.equal(calls.length, count, 'Disabled restart must not issue a duplicate request');
+  buttons['button.component-restart[data-component="discovery"]'].disabled = false;
+  await send('discovery');
+  assert.equal(calls.length, count + 1, 'Restart must work without user confirmation');
+  assert.equal(confirmations.length, 0, 'Restart must not use window.confirm');
   approve = true;
   const click = elements.components.click;
   buttons['button.component-restart[data-component="discovery"]'].disabled = false;
