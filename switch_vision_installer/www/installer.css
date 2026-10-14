@@ -28,7 +28,7 @@ header{display:flex;align-items:center;gap:14px;margin-bottom:16px}
 header p{margin:3px 0 0}
 .components-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
 .components-heading>div{min-width:0}
-.details>.check-updates{display:inline-flex;align-items:center;justify-content:center;gap:7px;justify-self:end;align-self:center;width:auto;min-width:0;min-height:35px;padding:7px 12px;border:1px solid var(--check-updates-border);border-radius:9px;background:linear-gradient(180deg,var(--check-updates-bg),var(--check-updates-bg-end));color:var(--check-updates-text);font-size:.82rem;font-weight:600;line-height:1.2;white-space:nowrap;box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 2px 5px rgba(0,0,0,.22)}
+.details>.check-updates{display:inline-flex;align-items:center;justify-content:center;gap:7px;justify-self:end;align-self:center;width:var(--check-action-width,auto);min-width:0;min-height:35px;padding:7px 12px;border:1px solid var(--check-updates-border);border-radius:9px;background:linear-gradient(180deg,var(--check-updates-bg),var(--check-updates-bg-end));color:var(--check-updates-text);font-size:.82rem;font-weight:600;line-height:1.2;white-space:nowrap;box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 2px 5px rgba(0,0,0,.22)}
 .details>.check-updates:hover{background:var(--check-updates-hover);border-color:var(--check-updates-border)}
 .details>.check-updates:focus-visible{outline:2px solid var(--heading-strong);outline-offset:2px}
 .details .check-updates span{display:inline;color:inherit;font-size:inherit}

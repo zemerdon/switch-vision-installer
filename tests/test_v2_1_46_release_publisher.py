@@ -8,7 +8,7 @@ CONFIG = (ROOT / "switch_vision_installer/config.yaml").read_text(
     encoding="utf-8"
 )
 
-assert 'version: "2.1.52"' in CONFIG
+assert 'version: "2.1.53"' in CONFIG
 assert "pull_request:" in WORKFLOW
 assert "types:" in WORKFLOW
 assert "- opened" in WORKFLOW

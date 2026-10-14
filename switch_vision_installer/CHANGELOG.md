@@ -1,3 +1,8 @@
+## v2.1.53 — Align update check with component actions
+
+- Align the left edge of the green Check for updates button in Core release details with the Core row Changelog button, matching the full Changelog/Reinstall/Restart action group at desktop widths.
+- Measure the rendered action group rather than hardcode its width, preserving alignment with Installer text-size and content-width preferences; restore natural button sizing at narrower layouts. Keep the action, appearance and all component operations unchanged.
+
 ## v2.1.52 — Core release update-check placement and green action style
 
 - Relocate the unchanged Check for updates action to the Core release details panel alongside the release metadata, with a responsive single-row desktop layout.

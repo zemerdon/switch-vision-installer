@@ -11,7 +11,7 @@ INDEX = (WWW / "index.html").read_text(encoding="utf-8")
 CSS = (WWW / "installer.css").read_text(encoding="utf-8")
 JS = (WWW / "installer.js").read_text(encoding="utf-8")
 VERSION = (ROOT / "switch_vision_installer/config.yaml").read_text(encoding="utf-8")
-assert 'version: "2.1.52"' in VERSION
+assert 'version: "2.1.53"' in VERSION
 
 
 class CheckPlacement(HTMLParser):
@@ -59,7 +59,7 @@ for token in (
     "--check-updates-text:#fff",
     ".details{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1.5fr) auto;",
     ".details>.check-updates{display:inline-flex;",
-    "justify-self:end;align-self:center;",
+    "justify-self:end;align-self:center;width:var(--check-action-width,auto);",
     "min-height:35px;padding:7px 12px;",
     "border-radius:9px;background:linear-gradient(180deg,var(--check-updates-bg),var(--check-updates-bg-end))",
     ".details .check-updates-icon{display:block;",
@@ -69,6 +69,15 @@ for token in (
     ".details>.check-updates{justify-self:end;width:auto;max-width:100%}",
 ):
     assert token in CSS, token
+
+# The Core row's rendered action span (Changelog through Restart/Update) is
+# the alignment source; changing UI text size must not use a fixed pixel guess.
+MANAGER = (WWW / "component-manager.js").read_text(encoding="utf-8")
+assert "function alignUpdateCheckWithCoreActions()" in MANAGER
+assert "new ResizeObserver(alignUpdateCheckWithCoreActions)" in MANAGER
+assert "window.addEventListener?.('resize',alignUpdateCheckWithCoreActions)" in MANAGER
+assert "watchUpdateCheckAlignment();" in MANAGER
+assert "--check-action-width" in MANAGER
 
 # Ensure green foreground/background meet 4.5:1 WCAG text contrast.
 def luminance(hex_color: str) -> float:
@@ -89,4 +98,4 @@ assert "await refresh(false)" in JS
 assert re.search(r"button:disabled\{opacity:", CSS)
 assert "id=\"system-actions-card\"" not in INDEX
 assert "Core install or reinstall</h2>" not in INDEX
-print("Installer v2.1.52 Core release update-check placement/color/routing: PASS")
+print("Installer v2.1.53 Core release update-check placement/color/routing: PASS")

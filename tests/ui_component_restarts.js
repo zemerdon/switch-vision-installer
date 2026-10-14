@@ -113,6 +113,28 @@ async function main() {
   assert.deepEqual(calls.at(-1), ['api/restart-discovery','POST']);
   assert(!script.includes('api/restart-installer'));
   assert(results.length > 0);
+  // Align the update button to the actual first Changelog action, not a
+  // fixed-width guess (font/density and available actions may vary).
+  const properties={};
+  elements.check={style:{
+    removeProperty:key=>{delete properties[key];},
+    setProperty:(key,value)=>{properties[key]=value;},
+  }};
+  const rects=[
+    {left:120,right:186,top:40},
+    {left:192,right:254,top:40},
+    {left:260,right:318,top:40},
+  ];
+  elements.components.querySelector=()=>({
+    querySelectorAll:()=>rects.map(rect=>({getBoundingClientRect:()=>rect})),
+  });
+  context.window.innerWidth=1600;
+  vm.runInContext('alignUpdateCheckWithCoreActions()',context);
+  assert.equal(properties['--check-action-width'],'198px','must align left edge with Changelog');
+  context.window.innerWidth=900;
+  vm.runInContext('alignUpdateCheckWithCoreActions()',context);
+  assert.equal(properties['--check-action-width'],undefined,'narrow layouts must size naturally');
   console.log('Installer v2.1.48 restart UI rendering/routing: PASS');
+  console.log('Installer v2.1.53 dynamic check-button alignment: PASS');
 }
 main().catch(error => {console.error(error); process.exitCode = 1;});

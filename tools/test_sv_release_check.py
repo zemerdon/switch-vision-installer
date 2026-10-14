@@ -20,7 +20,7 @@ SPEC.loader.exec_module(release)
 class InstallerReleaseCheckTests(unittest.TestCase):
     def test_current_version_contract_is_coherent(self):
         version = release.resolve_version(ROOT)
-        self.assertEqual(version, "2.1.52")
+        self.assertEqual(version, "2.1.53")
         release.validate_version_contract(ROOT, version)
 
     def test_release_dependency_set_is_intentionally_empty(self):

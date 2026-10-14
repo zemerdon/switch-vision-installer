@@ -54,6 +54,32 @@ function componentRestartAvailable(row){
   return ['discovery','snmp2mqtt','unifi2mqtt'].includes(row.id)&&Boolean(row.slug)&&['started','running'].includes(String(row.state||'').toLowerCase());
 }
 
+let checkActionObserver=null;
+function alignUpdateCheckWithCoreActions(){
+  const check=$('check');
+  if(!check?.style)return;
+  check.style.removeProperty('--check-action-width');
+  const actions=$('components')?.querySelector?.('.managed-component[data-component="core"] .managed-component-actions');
+  if(!actions||window.innerWidth<=1150)return;
+  const buttons=actions.querySelectorAll('button');
+  if(!buttons.length)return;
+  const first=buttons[0].getBoundingClientRect();
+  const last=buttons[buttons.length-1].getBoundingClientRect();
+  if(Math.abs(last.top-first.top)>1)return;
+  const width=Math.round(last.right-first.left);
+  if(width>0)check.style.setProperty('--check-action-width',`${width}px`);
+}
+function watchUpdateCheckAlignment(){
+  if(checkActionObserver)checkActionObserver.disconnect();
+  const actions=$('components')?.querySelector?.('.managed-component[data-component="core"] .managed-component-actions');
+  if(typeof ResizeObserver==='function'&&actions){
+    checkActionObserver=new ResizeObserver(alignUpdateCheckWithCoreActions);
+    checkActionObserver.observe(actions);
+  }
+  alignUpdateCheckWithCoreActions();
+}
+window.addEventListener?.('resize',alignUpdateCheckWithCoreActions);
+
 function renderManagedComponents(){
   const host=$('components');
   const rows=managedComponentSnapshot?.components||[];
@@ -86,6 +112,7 @@ function renderManagedComponents(){
     updateAll.title=blocked?(managedComponentSnapshot?.update_all_blocked_reason||'Update All is blocked by a dependency.'):'';
     updateAll.textContent=blocked?'Update All blocked':(actionable.length?`Update All (${actionable.length})`:'Everything up to date');
   }
+  watchUpdateCheckAlignment();
   const note=document.querySelector('.component-manager-note');
   if(note){
     if(managedComponentSnapshot?.update_all_blocked){
