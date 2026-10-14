@@ -34,7 +34,8 @@ assert "System actions</h2>" not in index
 assert {"check", "components", "result"}.issubset(parser.ids)
 assert "install" not in parser.ids
 assert index.count('id="check"') == 1
-assert index.index('id="check"') < index.index('<section class="grid">')
+assert index.index('id="check"') > index.index('<h2>Components</h2>')
+assert index.index('id="check"') < index.index('id="components"')
 assert "Core install or reinstall</h2>" not in index
 assert "check-updates" in index
 assert "$('install')" not in installer_js

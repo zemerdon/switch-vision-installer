@@ -1,3 +1,8 @@
+## v2.1.49 — Components update-check placement
+
+- Move the existing Check for updates action from the page header to the right side of the Components heading, using a purple high-contrast button and responsive full-width mobile presentation.
+- Keep its existing Supervisor/component refresh route, loading/disabled behavior and component lifecycle controls unchanged.
+
 ## v2.1.48 — Component-local restart controls
 
 - Remove the redundant standalone Core install/reinstall card and move Check for updates into the top header; preserve the Core component-row Install, Update and Reinstall paths.
