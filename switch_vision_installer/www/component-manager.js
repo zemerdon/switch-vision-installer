@@ -48,6 +48,12 @@ function managedComponentAction(row){
   return'';
 }
 
+function componentRestartAvailable(row){
+  if(!row.installed||row.id==='installer')return false;
+  if(row.id==='core')return true;
+  return ['discovery','snmp2mqtt','unifi2mqtt'].includes(row.id)&&Boolean(row.slug)&&['started','running'].includes(String(row.state||'').toLowerCase());
+}
+
 function renderManagedComponents(){
   const host=$('components');
   const rows=managedComponentSnapshot?.components||[];
@@ -67,6 +73,7 @@ function renderManagedComponents(){
       <div class="managed-component-actions">
         <button class="secondary component-changelog" type="button" data-component="${esc(row.id)}">Changelog</button>
         ${row.installed?`<button class="${row.id==='installer'?'component-external-reinstall':'component-reinstall'}" type="button" data-component="${esc(row.id)}" data-label="${esc(row.label)}" ${(!row.dependency_ok&&row.id==='discovery')?'disabled':''}>${row.id==='installer'?'Reinstall in Home Assistant':'Reinstall'}</button>`:''}
+        ${row.installed&&row.id!=='installer'?`<button class="component-restart ${row.id==='core'?'danger':'secondary'}" type="button" data-component="${esc(row.id)}" data-label="${esc(row.label)}" ${componentRestartAvailable(row)?'':'disabled title="Restart requires a running Supervisor app."'}>Restart</button>`:''}
         ${action?`<button class="${row.id==='installer'?'component-external-update':'component-update'}" type="button" data-component="${esc(row.id)}" ${(!row.dependency_ok&&row.id==='discovery')?'disabled':''}>${esc(action)}</button>`:''}
       </div>
     </div>`;
@@ -127,8 +134,29 @@ async function requestComponentReinstall(component,label){
   }catch(error){showResult(`Component reinstall failed: ${esc(error.message)}`,'error');}
 }
 
-const legacyRenderComponents=renderComponents;
-renderComponents=function(){renderManagedComponents();};
+async function requestComponentRestart(component,label){
+  const routes={
+    core:'api/restart-core',
+    discovery:'api/restart-discovery',
+    snmp2mqtt:'api/restart-snmp2mqtt',
+    unifi2mqtt:'api/restart-unifi2mqtt'
+  };
+  const route=routes[component];
+  const row=managedComponentSnapshot?.components?.find(item=>item.id===component);
+  if(!route||!row||!componentRestartAvailable(row))return;
+  const name=component==='core'?'Home Assistant Core':(label||row.label);
+  if(!window.confirm(component==='core'?'Restart Home Assistant Core now?':`Restart ${name} now? The service may be briefly unavailable.`))return;
+  const button=document.querySelector(`button.component-restart[data-component="${component}"]`);
+  if(button)button.disabled=true;
+  try{
+    await json(route,{method:'POST'});
+    showResult(`${esc(name)} restart requested. The page may briefly disconnect.`,'success');
+    if(component!=='core')setTimeout(()=>refresh(false),5000);
+  }catch(error){
+    if(button)button.disabled=false;
+    showResult(`Restart failed: ${esc(error.message)}`,'error');
+  }
+}
 
 const legacyRefresh=refresh;
 refresh=async function(showLast=true){
@@ -143,6 +171,8 @@ $('components').addEventListener('click',event=>{
   if(externalReinstall){showResult('Reinstall Switch Vision Installer from Home Assistant Settings → Apps → Switch Vision Installer. The running Installer cannot safely remove and replace itself.','muted');return;}
   const reinstall=event.target.closest('.component-reinstall');
   if(reinstall){requestComponentReinstall(reinstall.dataset.component,reinstall.dataset.label);return;}
+  const restart=event.target.closest('.component-restart');
+  if(restart){requestComponentRestart(restart.dataset.component,restart.dataset.label);return;}
   const external=event.target.closest('.component-external-update');
   if(external){showResult('Update Switch Vision Installer from Home Assistant Settings → Apps → Switch Vision Installer. The running Installer cannot safely replace itself.','muted');return;}
   const update=event.target.closest('.component-update');
@@ -153,5 +183,3 @@ $('update-all-components')?.addEventListener('click',async()=>{
   try{await json('api/update-all',{method:'POST'});pollOperation();}
   catch(error){showResult(`Update All failed: ${esc(error.message)}`,'error');}
 });
-
-loadManagedComponents();

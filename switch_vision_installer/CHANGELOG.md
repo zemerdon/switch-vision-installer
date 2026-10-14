@@ -1,3 +1,10 @@
+## v2.1.48 — Component-local restart controls
+
+- Remove the redundant standalone Core install/reinstall card and move Check for updates into the top header; preserve the Core component-row Install, Update and Reinstall paths.
+- Remove the separate System actions panel and place a confirmed Restart immediately after Reinstall in each supported installed component row: Home Assistant Core, Discovery, SNMP2MQTT and UniFi2MQTT.
+- Show restart as unavailable for stopped apps and omit it for Installer, which has no independent safe self-restart route; recheck live Supervisor running state before every add-on restart.
+- Keep Changelog, Update, Reinstall, Core install/reinstall, existing Core recovery/restart prompts and Supervisor/ingress safeguards; make component actions compact and responsive.
+
 ## v2.1.47 — Fail-closed Supervisor app status
 
 - Treat Supervisor app-status lookup failures as unavailable control state instead of silently interpreting them as an app not being installed.

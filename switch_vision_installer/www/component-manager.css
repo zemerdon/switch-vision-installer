@@ -1,3 +1,16 @@
-.managed-component{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:14px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
-.managed-component:last-child{border-bottom:0}.managed-component-title{font-weight:700;color:var(--text)}.managed-component-version{font-size:.9em;color:var(--muted);margin-top:3px}.managed-component-release{font-size:.82em;color:var(--muted);margin-top:2px}.managed-component-state{white-space:nowrap}.managed-component-actions{display:flex;gap:8px;justify-content:flex-end}.managed-component-actions button{margin:0}.component-dependency{font-size:.84em;color:var(--warn);margin-top:4px}.component-repo-note{font-size:.72em;font-weight:600;color:var(--muted);margin-left:6px}.component-manager-loading,.component-manager-error{padding:12px 0;color:var(--muted)}.component-manager-toolbar{display:flex;justify-content:flex-end;margin-top:14px}.component-manager-note{margin-top:12px;color:var(--muted);font-size:.9em}
-@media(max-width:760px){.managed-component{grid-template-columns:1fr}.managed-component-state{justify-self:start}.managed-component-actions{justify-content:flex-start;flex-wrap:wrap}}
+.managed-component{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.managed-component:last-child{border-bottom:0}
+.managed-component-main{min-width:0}
+.managed-component-title{font-weight:700;color:var(--text)}
+.managed-component-version{font-size:.9em;color:var(--muted);margin-top:3px}
+.managed-component-release{font-size:.82em;color:var(--muted);margin-top:2px}
+.managed-component-state{white-space:nowrap}
+.managed-component-actions{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.managed-component-actions button{margin:0;padding:8px 10px;white-space:nowrap}
+.component-dependency{font-size:.84em;color:var(--warn);margin-top:4px}
+.component-repo-note{font-size:.72em;font-weight:600;color:var(--muted);margin-left:6px}
+.component-manager-loading,.component-manager-error{padding:12px 0;color:var(--muted)}
+.component-manager-toolbar{display:flex;justify-content:flex-end;margin-top:14px}
+.component-manager-note{margin-top:12px;color:var(--muted);font-size:.9em}
+@media(max-width:1150px){.managed-component{grid-template-columns:minmax(0,1fr) auto}.managed-component-actions{grid-column:1/-1;justify-content:flex-start}}
+@media(max-width:560px){.managed-component{grid-template-columns:minmax(0,1fr)}.managed-component-state{justify-self:start}.managed-component-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.managed-component-actions button{min-width:0;white-space:normal}}

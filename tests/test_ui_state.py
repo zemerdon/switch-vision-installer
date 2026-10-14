@@ -23,12 +23,14 @@ assert not (WWW / "changelog-history.js").exists()
 assert "legacyChangelog=$('show-changelog')" not in manager_js
 assert "legacy repo alias active" not in manager_js
 
-assert 'id="install-unifi2mqtt" class="secondary hidden"' in index
-assert "function syncSystemActions" in installer_js
-assert "$('install-unifi2mqtt').classList.toggle('hidden',unifiInstalled||!s.unifi2mqtt_available)" in installer_js
-assert "$('restart-unifi2mqtt').classList.toggle('hidden',!unifiInstalled)" in installer_js
-assert "$('restart-discovery').classList.toggle('hidden',!discoveryInstalled)" in installer_js
-assert "$('restart-snmp2mqtt').classList.toggle('hidden',!snmpInstalled)" in installer_js
+assert 'id="system-actions-card"' not in index
+assert 'System actions</h2>' not in index
+assert 'id="install"' not in index and index.count('id="check"') == 1
+assert index.index('id="check"') < index.index('<section class="grid">')
+assert "Core install or reinstall</h2>" not in index
+assert "function syncSystemActions" not in installer_js
+for obsolete_id in ('restart-core','restart-discovery','restart-snmp2mqtt','restart-unifi2mqtt','install-discovery','install-snmp2mqtt','install-unifi2mqtt'):
+    assert f'id="{obsolete_id}"' not in index
 
 assert "Restart Home Assistant Core required" in installer_js
 assert 'id="result-restart-core"' in installer_js

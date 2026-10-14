@@ -331,6 +331,24 @@ def supervisor_request(path: str, method: str = "POST") -> dict:
         return {"ok": True, "status": response.status, "message": text[:500]}
 
 
+def restart_running_addon(component: str) -> dict:
+    """Revalidate live Supervisor state immediately before an add-on restart."""
+    resolvers = {
+        "discovery": find_discovery_slug,
+        "snmp2mqtt": find_snmp2mqtt_slug,
+        "unifi2mqtt": find_unifi2mqtt_slug,
+    }
+    if component not in resolvers:
+        raise RuntimeError("Unsupported add-on restart target.")
+    slug = resolvers[component]()
+    response = installer_core.supervisor_request(f"/addons/{slug}/info")
+    info = response.get("data") if isinstance(response, dict) else None
+    state = str(info.get("state") or "").lower() if isinstance(info, dict) else ""
+    if state not in {"started", "running"}:
+        raise RuntimeError(f"Cannot restart {component}: Supervisor did not confirm a running app.")
+    return {"ok": True, "requested": True, "supervisor": supervisor_request(f"/addons/{slug}/restart")}
+
+
 def request_core_restart_async() -> dict:
     """Restart Home Assistant Core and finish Switch Vision entry recovery."""
     supervisor_request("/core/restart")
@@ -508,7 +526,7 @@ class Handler(BaseHTTPRequestHandler):
                     return {"ok": True, "requested": True, **result}
                 return self.send_json(run_locked("install discovery", install_discovery_action))
             if path == "/api/restart-discovery":
-                return self.send_json(run_locked("restart discovery", lambda: {"ok": True, "requested": True, "supervisor": supervisor_request(f"/addons/{find_discovery_slug()}/restart")}))
+                return self.send_json(run_locked("restart discovery", lambda: restart_running_addon("discovery")))
             if path == "/api/install-snmp2mqtt":
                 def install_snmp_action():
                     ensure_snmp2mqtt_repository()
@@ -516,7 +534,7 @@ class Handler(BaseHTTPRequestHandler):
                     return {"ok": True, "requested": True, **result}
                 return self.send_json(run_locked("install snmp2mqtt", install_snmp_action))
             if path == "/api/restart-snmp2mqtt":
-                return self.send_json(run_locked("restart snmp2mqtt", lambda: {"ok": True, "requested": True, "supervisor": supervisor_request(f"/addons/{find_snmp2mqtt_slug()}/restart")}))
+                return self.send_json(run_locked("restart snmp2mqtt", lambda: restart_running_addon("snmp2mqtt")))
             if path == "/api/install-unifi2mqtt":
                 def install_unifi_action():
                     ensure_unifi2mqtt_repository()
@@ -524,7 +542,7 @@ class Handler(BaseHTTPRequestHandler):
                     return {"ok": True, "requested": True, **result}
                 return self.send_json(run_locked("install unifi2mqtt", install_unifi_action))
             if path == "/api/restart-unifi2mqtt":
-                return self.send_json(run_locked("restart unifi2mqtt", lambda: {"ok": True, "requested": True, "supervisor": supervisor_request(f"/addons/{find_unifi2mqtt_slug()}/restart")}))
+                return self.send_json(run_locked("restart unifi2mqtt", lambda: restart_running_addon("unifi2mqtt")))
             self.send_error(404)
         except RequestBodyError as exc:
             self.send_json({"ok": False, "error": str(exc)}, exc.status)

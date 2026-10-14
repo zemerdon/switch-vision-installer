@@ -25,6 +25,9 @@ body{margin:0;background:radial-gradient(circle at top,var(--heading-soft) 0,var
 main{max-width:1040px;margin:auto;padding:22px 16px 42px}
 header{display:flex;align-items:center;gap:14px;margin-bottom:16px}
 header p{margin:3px 0 0}
+.header-title{flex:1;min-width:0}
+.header-actions{margin-left:auto;display:flex;align-items:center}
+.header-actions .check-updates{padding:10px 16px;white-space:nowrap;border-color:var(--accent-strong)}
 .mark{width:48px;height:48px;border:1px solid var(--accent-strong);border-radius:15px;display:grid;place-items:center;font-weight:800;font-size:1.25rem;box-shadow:0 0 22px var(--heading-glow);color:var(--heading-strong);background:var(--accent-soft)}
 h1{margin:0;font-size:var(--sv-title);line-height:1.15;color:var(--heading-strong)}
 h2{margin:0 0 8px;font-size:var(--sv-section);line-height:1.2;color:var(--heading)}
@@ -97,7 +100,9 @@ select{background:var(--surface-input);color:var(--text);min-width:280px}
   :root{font-size:14px}
   main{padding:16px 12px 30px}
   .grid,.details{grid-template-columns:1fr}
-  header{align-items:flex-start}
+  header{align-items:flex-start;flex-wrap:wrap}
+  .header-actions{flex-basis:100%;margin-left:0}
+  .header-actions .check-updates{width:100%}
   .status-card{align-items:flex-start;flex-direction:column}
   .latest-release-row{align-items:flex-start;flex-direction:column}
   .changelog-heading{align-items:flex-start}
