@@ -26,8 +26,9 @@ assert "legacy repo alias active" not in manager_js
 assert 'id="system-actions-card"' not in index
 assert 'System actions</h2>' not in index
 assert 'id="install"' not in index and index.count('id="check"') == 1
-assert index.index('id="check"') > index.index('<h2>Components</h2>')
-assert index.index('id="check"') < index.index('id="components"')
+assert index.index('id="check"') > index.index('<h2>Core release details</h2>')
+assert index.index('id="check"') > index.index('id="published"')
+assert index.index('id="check"') < index.index('<h2>Components</h2>')
 assert "Core install or reinstall</h2>" not in index
 assert "function syncSystemActions" not in installer_js
 for obsolete_id in ('restart-core','restart-discovery','restart-snmp2mqtt','restart-unifi2mqtt','install-discovery','install-snmp2mqtt','install-unifi2mqtt'):

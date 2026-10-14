@@ -18,7 +18,7 @@
   --button-primary-bg:#0f4f7d;--button-primary-text:#fff;
   --button-secondary-bg:#1c3856;--button-secondary-text:#edf5fc;
   --button-danger-bg:#8b3540;--button-danger-text:#fff;
-  --check-updates-bg:#42276b;--check-updates-bg-end:#583587;--check-updates-hover:#654092;--check-updates-border:#604682;--check-updates-text:#f9f5ff;
+  --check-updates-bg:#147a34;--check-updates-bg-end:#08652b;--check-updates-hover:#166e32;--check-updates-border:#41b55c;--check-updates-text:#fff;
   --sv-body:16px;--sv-title:max(18px,1.83em);--sv-section:max(14px,1.2em);--sv-small:max(10px,.86em);
 }
 *{box-sizing:border-box}
@@ -28,10 +28,11 @@ header{display:flex;align-items:center;gap:14px;margin-bottom:16px}
 header p{margin:3px 0 0}
 .components-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
 .components-heading>div{min-width:0}
-.components-heading .check-updates{display:inline-flex;align-items:center;justify-content:center;gap:7px;flex:0 0 auto;align-self:flex-start;width:auto;min-width:0;min-height:35px;padding:7px 12px;border:1px solid var(--check-updates-border);border-radius:8px;background:linear-gradient(135deg,var(--check-updates-bg),var(--check-updates-bg-end));color:var(--check-updates-text);font-size:.82rem;font-weight:600;line-height:1.2;white-space:nowrap;box-shadow:none}
-.components-heading .check-updates:hover{background:var(--check-updates-hover);border-color:var(--check-updates-hover)}
-.components-heading .check-updates:focus-visible{outline:2px solid var(--heading-strong);outline-offset:2px}
-.components-heading .check-updates-icon{display:block;flex:0 0 15px;width:15px;height:15px}
+.details>.check-updates{display:inline-flex;align-items:center;justify-content:center;gap:7px;justify-self:end;align-self:center;width:auto;min-width:0;min-height:35px;padding:7px 12px;border:1px solid var(--check-updates-border);border-radius:9px;background:linear-gradient(180deg,var(--check-updates-bg),var(--check-updates-bg-end));color:var(--check-updates-text);font-size:.82rem;font-weight:600;line-height:1.2;white-space:nowrap;box-shadow:inset 0 1px 0 rgba(255,255,255,.15),0 2px 5px rgba(0,0,0,.22)}
+.details>.check-updates:hover{background:var(--check-updates-hover);border-color:var(--check-updates-border)}
+.details>.check-updates:focus-visible{outline:2px solid var(--heading-strong);outline-offset:2px}
+.details .check-updates span{display:inline;color:inherit;font-size:inherit}
+.details .check-updates-icon{display:block;flex:0 0 15px;width:15px;height:15px}
 .mark{width:48px;height:48px;border:1px solid var(--accent-strong);border-radius:15px;display:grid;place-items:center;font-weight:800;font-size:1.25rem;box-shadow:0 0 22px var(--heading-glow);color:var(--heading-strong);background:var(--accent-soft)}
 h1{margin:0;font-size:var(--sv-title);line-height:1.15;color:var(--heading-strong)}
 h2{margin:0 0 8px;font-size:var(--sv-section);line-height:1.2;color:var(--heading)}
@@ -73,7 +74,7 @@ a{color:var(--link)}a:hover{color:var(--link-hover)}
 .components{display:grid;gap:6px}
 .component{display:flex;justify-content:space-between;gap:12px;padding:7px 10px;background:var(--surface-inset);border-radius:8px;line-height:1.3}
 .ok{color:var(--ok)}.missing{color:var(--warn)}
-.details{display:grid;grid-template-columns:2fr 1fr 1.5fr;gap:8px}
+.details{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1.5fr) auto;align-items:stretch;gap:8px}
 .details>div{background:var(--surface-inset);border-radius:8px;padding:8px 9px}
 .details strong{display:block;margin-top:4px;overflow-wrap:anywhere;font-size:.9rem}
 .actions,.restore-row{display:flex;gap:7px;flex-wrap:wrap}
@@ -106,7 +107,7 @@ select{background:var(--surface-input);color:var(--text);min-width:280px}
   .grid,.details{grid-template-columns:1fr}
   header{align-items:flex-start;flex-wrap:wrap}
   .components-heading{align-items:flex-start;flex-direction:column}
-  .components-heading .check-updates{align-self:flex-end;width:auto;min-width:0}
+  .details>.check-updates{justify-self:end;width:auto;max-width:100%}
   .status-card{align-items:flex-start;flex-direction:column}
   .latest-release-row{align-items:flex-start;flex-direction:column}
   .changelog-heading{align-items:flex-start}

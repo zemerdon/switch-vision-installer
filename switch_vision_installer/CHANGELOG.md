@@ -1,3 +1,8 @@
+## v2.1.52 — Core release update-check placement and green action style
+
+- Relocate the unchanged Check for updates action to the Core release details panel alongside the release metadata, with a responsive single-row desktop layout.
+- Apply the approved green gradient, subtle bevel, refresh icon and compact sizing; preserve the exact update-check endpoint, disabled/loading state, and all other Installer component actions.
+
 ## v2.1.51 — Refined Components update-check appearance
 
 - Match the approved Local Installer visual reference with a dark, subtle purple gradient, low-key border, small refresh icon and compact native-size typography.
