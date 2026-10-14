@@ -1,3 +1,8 @@
+## v2.1.51 — Refined Components update-check appearance
+
+- Match the approved Local Installer visual reference with a dark, subtle purple gradient, low-key border, small refresh icon and compact native-size typography.
+- Keep the existing Components heading position, responsive layout, original update-check action and all existing lifecycle safeguards unchanged.
+
 ## v2.1.50 — Compact Components update-check button
 
 - Match the established compact purple action styling: fit text rather than imposing a large minimum width/height, top-align on desktop, and right-align without stretching on mobile.
