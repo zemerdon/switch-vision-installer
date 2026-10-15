@@ -78,7 +78,47 @@ def test_no_fabricated_archive_on_untrusted_installed_art() -> None:
         assert not (stage / "faceplate-history").exists()
         assert name == "same.png", "model stock filenames must never be renamed"
 
+def test_catalogue_archives_unchanged_and_changed_stock_images() -> None:
+    with TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        existing, incoming = root / "installed", root / "new"
+        component = root / "installed-component"
+        name1, name2 = "same.png", "edited.png"
+        old1, old2, new2 = b"unchanged", b"old-artwork", b"new-artwork"
+        hashes = {name1: hashlib.sha256(old1).hexdigest(),
+                  name2: hashlib.sha256(old2).hexdigest()}
+        component.mkdir()
+        (component / "stock-assets.json").write_text(json.dumps({
+            "schema": "switch-vision-stock-assets-v1",
+            "assets": {"faceplates": hashes},
+        }))
+        new_component = incoming / "custom_components/switch_vision"
+        new_component.mkdir(parents=True)
+        (new_component / "stock-assets.json").write_text(json.dumps({
+            "schema": "switch-vision-stock-assets-v1",
+            "assets": {"faceplates": {
+                name1: hashes[name1], name2: hashlib.sha256(new2).hexdigest()
+            }},
+        }))
+        _image(existing, name1, old1)
+        _image(existing, name2, old2)
+        _image(incoming, name1, old1)
+        _image(incoming, name2, new2)
+        stage = root / "stage"
+        assert history.stage_history(incoming, component, existing, stage) == 1
+        assert (stage / "faceplate-history" / hashes[name1] / name1).read_bytes() == old1
+        assert (stage / "faceplate-history" / hashes[name2] / name2).read_bytes() == old2
+        assert (stage / "faceplate-history" / "legacy" / name2).read_bytes() == old2
+        # Repeated versions deduplicate unchanged originals.
+        from shutil import copytree
+        copytree(stage / "faceplate-history", existing / "faceplate-history")
+        again = root / "again"
+        assert history.stage_history(incoming, component, existing, again) == 1
+        assert (again / "faceplate-history" / hashes[name1] / name1).read_bytes() == old1
+
+
 if __name__ == "__main__":
+    test_catalogue_archives_unchanged_and_changed_stock_images()
     test_same_name_installer_retains_original_for_preview()
     test_no_fabricated_archive_on_untrusted_installed_art()
     print("INSTALLER_SAME_NAME_FACEPLATE_HISTORY_PASS")

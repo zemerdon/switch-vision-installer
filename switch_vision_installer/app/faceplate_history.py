@@ -77,6 +77,23 @@ def stage_history(release_root: Path, installed_component: Path,
 
     installed = _stock_images(installed_component)
     incoming = _stock_images(release_root / "custom_components" / "switch_vision")
+    # Snapshot the entire outgoing verified stock catalogue, even unchanged
+    # artwork. The content-addressed directory deduplicates across versions;
+    # original names in the new stock folder remain untouched.
+    for name, prior in sorted(installed.items()):
+        old = installed_frontend / "faceplates" / name
+        if not _verified_image(old, prior):
+            continue
+        archived = new_dir / prior / name
+        if archived.exists():
+            if not _verified_image(archived, prior):
+                raise RuntimeError("Previous faceplate history failed integrity validation.")
+            continue
+        archived.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(old, archived)
+    if len(list(new_dir.glob("*/*.png"))) > 512:
+        raise RuntimeError("Stock artwork history exceeds the bounded version inventory.")
+
     changed = 0
     for name in sorted(set(installed) & set(incoming)):
         prior, next_sha = installed[name], incoming[name]

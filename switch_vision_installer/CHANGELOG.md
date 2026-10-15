@@ -1,3 +1,9 @@
+## v2.1.55 — Verified stock faceplate holding catalog (Local)
+
+- Before replacing Core's stock images, preserve all manifest-verified outgoing faceplate PNGs in a content-addressed holding directory, including unchanged files.
+- Keep stable canonical stock filenames and deduplicate retained image bytes across versions; fail safely on untrusted/tampered assets or excessive retained inventory.
+- Enable old/new per-switch approval without automatically changing saved Calibration.
+
 ## v2.1.54 — Retain prior stock faceplates across Core updates (Local)
 
 - Before atomic Core frontend replacement, verify installed and incoming stock PNG hashes against their respective packaged manifests and retain the replaced image under a separate content-addressed artwork history.
