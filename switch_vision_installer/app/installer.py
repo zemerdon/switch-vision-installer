@@ -25,7 +25,6 @@ if str(_MODULE_DIR) not in sys.path:
 
 import backup_manager as _backup_manager
 import faceplate_history as _faceplate_history
-import faceplate_upgrade_record as _faceplate_upgrade_record
 import tree_transaction as _tree_transaction
 
 
@@ -56,7 +55,7 @@ UNIFI2MQTT_DIR = LOCAL_APPS_DIR / "switch_vision_unifi2mqtt"
 SHARE_DIR = Path("/share")
 GENERATED_SNMP2MQTT_YAML = SHARE_DIR / "switch_vision" / "generated-snmp2mqtt.yaml"
 
-FRONTEND_FOLDERS = ("calibration", "css", "faceplates", "js", "layouts", "logos")
+FRONTEND_FOLDERS = ("calibration", "css", "faceplates", "faceplates-old", "js", "layouts", "logos")
 BUNDLED_ASSET_NAMES = {
     "logos": {"sv-logo.png", "cisco.svg", "juniper.svg", "1984-cisco-logo.svg", "1996-cisco-logo.svg", "2016-cisco-logo.svg", "README.txt"},
     "faceplates": {"sv-dark.png", "sv-light.png", "README.txt"},
@@ -1638,14 +1637,6 @@ def install_release(root: Path, version: str, checksum: str, progress: Progress 
     backup = create_backup() if changed else None
     if backup is not None:
         validate_backup(backup)
-    if changed:
-        previous_art = _faceplate_upgrade_record.prepare_record(
-            root, COMPONENT_DIR, FRONTEND_DIR, WORK_DIR / "plan-frontend",
-            get_discovery_options(),
-        )
-        _faceplate_upgrade_record.store_record(
-            HA_CONFIG / "switch-vision-faceplate-upgrades.json", previous_art,
-        )
     if progress: progress("Backup verified. Installing changed components…", 62)
     custom_assets = collect_custom_assets(); installed=[]; preserved=[]; warnings=[]
     try:

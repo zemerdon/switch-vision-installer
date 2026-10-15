@@ -1,3 +1,8 @@
+## v2.1.57 — Bundled Core artwork revisions (Local)
+
+- Install the Core-shipped `faceplates-old` image/factory-geometry archive and manifest without requiring component updates in a fixed order.
+- Preserve normal Core installation, verified backups, personal assets and existing legacy-history compatibility.
+
 ## v2.1.56 — Pre-upgrade artwork capture (Local)
 
 - Before replacing any Core files, record existing configured switch identities with exact verified outgoing/incoming stock image SHA-256 pairs in a private config file.
