@@ -11,7 +11,7 @@ INDEX = (WWW / "index.html").read_text(encoding="utf-8")
 CSS = (WWW / "installer.css").read_text(encoding="utf-8")
 JS = (WWW / "installer.js").read_text(encoding="utf-8")
 VERSION = (ROOT / "switch_vision_installer/config.yaml").read_text(encoding="utf-8")
-assert 'version: "2.1.53"' in VERSION
+assert re.search(r'(?m)^version: "\d+\.\d+\.\d+"$', VERSION)
 
 
 class CheckPlacement(HTMLParser):

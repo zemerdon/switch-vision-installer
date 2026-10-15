@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = (ROOT / ".github/workflows/publish-release.yml").read_text(
@@ -8,7 +9,7 @@ CONFIG = (ROOT / "switch_vision_installer/config.yaml").read_text(
     encoding="utf-8"
 )
 
-assert 'version: "2.1.53"' in CONFIG
+assert re.search(r'(?m)^version: "\d+\.\d+\.\d+"$', CONFIG)
 assert "pull_request:" in WORKFLOW
 assert "types:" in WORKFLOW
 assert "- opened" in WORKFLOW

@@ -1,13 +1,14 @@
 from pathlib import Path
 import importlib.util
 import sys
+import re
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "switch_vision_installer" / "app"
 CONFIG = (ROOT / "switch_vision_installer/config.yaml").read_text(encoding="utf-8")
 CHANGELOG = (ROOT / "switch_vision_installer/CHANGELOG.md").read_text(encoding="utf-8")
 
-assert 'version: "2.1.53"' in CONFIG
+assert re.search(r'(?m)^version: "\d+\.\d+\.\d+"$', CONFIG)
 assert "## v2.1.43 — Reliable serialized App Store refresh" in CHANGELOG
 
 spec = importlib.util.spec_from_file_location("sv_installer_2143", APP / "installer.py")

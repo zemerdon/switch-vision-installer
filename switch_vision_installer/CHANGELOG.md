@@ -1,3 +1,9 @@
+## v2.1.54 — Retain prior stock faceplates across Core updates (Local)
+
+- Before atomic Core frontend replacement, verify installed and incoming stock PNG hashes against their respective packaged manifests and retain the replaced image under a separate content-addressed artwork history.
+- Preserve the first verified original for pre-fingerprint Calibration profiles and carry prior history forward in later installations, without changing model filenames, factory geometry, custom art or existing backup/rollback protections.
+- Never treat unrecognised, modified, missing or symlinked stock files as authenticated historical evidence.
+
 ## v2.1.53 — Align update check with component actions
 
 - Align the left edge of the green Check for updates button in Core release details with the Core row Changelog button, matching the full Changelog/Reinstall/Restart action group at desktop widths.

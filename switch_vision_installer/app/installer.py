@@ -24,6 +24,7 @@ if str(_MODULE_DIR) not in sys.path:
     sys.path.insert(0, str(_MODULE_DIR))
 
 import backup_manager as _backup_manager
+import faceplate_history as _faceplate_history
 import tree_transaction as _tree_transaction
 
 
@@ -1606,6 +1607,9 @@ def build_frontend_stage(root: Path, target: Path) -> None:
     for folder in FRONTEND_FOLDERS:
         source = root / folder
         if source.is_dir(): shutil.copytree(source, target / folder)
+    # Preserve image revisions before atomic frontend replacement. An artwork
+    # correction keeps its canonical filename and existing Calibration geometry.
+    _faceplate_history.stage_history(root, COMPONENT_DIR, FRONTEND_DIR, target)
 
 
 def component_plan(root: Path, *, force: bool = False) -> tuple[list[tuple[Path, Path, str]], list[str], list[str]]:
