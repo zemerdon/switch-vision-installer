@@ -14,3 +14,12 @@
 .component-manager-note{margin-top:12px;color:var(--muted);font-size:.9em}
 @media(max-width:1150px){.managed-component{grid-template-columns:minmax(0,1fr) auto}.managed-component-actions{grid-column:1/-1;justify-content:flex-start}}
 @media(max-width:560px){.managed-component{grid-template-columns:minmax(0,1fr)}.managed-component-state{justify-self:start}.managed-component-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.managed-component-actions button{min-width:0;white-space:normal}}
+
+/* Upgrade summary is informational; per-switch approval stays in Discovery. */
+.faceplate-review-card {border:1px solid var(--border);border-radius:12px;padding:14px;margin-top:16px;}
+.faceplate-review-card h3 {margin:0 0 8px;}
+.faceplate-review-card p {margin:6px 0 12px;}
+.faceplate-review-row {display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--border);}
+.faceplate-review-row img {width:130px;height:55px;object-fit:contain;max-width:32%;background:var(--surface-inset);border-radius:4px;}
+.faceplate-review-row b {overflow-wrap:anywhere;}
+.faceplate-review-actions {display:flex;flex-wrap:wrap;gap:10px;padding-top:8px;}

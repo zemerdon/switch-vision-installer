@@ -147,9 +147,19 @@ async function openComponentChangelog(component){
 
 async function requestComponentUpdate(component){
   try{
-    await json('api/update-component',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({component})});
+    if(component==='core' && managedComponentSnapshot?.components?.find(row=>row.id==='core')?.installed){
+      // Compare SHA pairs from the verified incoming ZIP before committing to
+      // the Core replacement. The preflight remains read-only.
+      window.svCoreUpgradePreflight='core';
+      await json('api/dry-run',{method:'POST'});
+    }else{
+      await json('api/update-component',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({component})});
+    }
     pollOperation();
-  }catch(error){showResult(`Component update failed: ${esc(error.message)}`,'error');}
+  }catch(error){
+    window.svCoreUpgradePreflight='';
+    showResult(`Component update failed: ${esc(error.message)}`,'error');
+  }
 }
 
 async function requestComponentReinstall(component,label){
@@ -207,6 +217,17 @@ $('components').addEventListener('click',event=>{
 });
 
 $('update-all-components')?.addEventListener('click',async()=>{
-  try{await json('api/update-all',{method:'POST'});pollOperation();}
-  catch(error){showResult(`Update All failed: ${esc(error.message)}`,'error');}
+  try{
+    const core=managedComponentSnapshot?.components?.find(row=>row.id==='core');
+    if(core?.installed && core.update_available){
+      window.svCoreUpgradePreflight='all';
+      await json('api/dry-run',{method:'POST'});
+    }else{
+      await json('api/update-all',{method:'POST'});
+    }
+    pollOperation();
+  }catch(error){
+    window.svCoreUpgradePreflight='';
+    showResult(`Update All failed: ${esc(error.message)}`,'error');
+  }
 });

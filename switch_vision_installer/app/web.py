@@ -2,7 +2,8 @@ from __future__ import annotations
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from dataclasses import asdict, is_dataclass
-import json, os, threading, time, traceback, urllib.request
+import json, os, threading, time, traceback, urllib.request, hashlib, re
+from urllib.parse import urlsplit, parse_qs
 import installer as installer_core
 
 INSTALLER_VERSION = str(os.environ.get("SV_INSTALLER_VERSION") or installer_core.INSTALLER_VERSION).strip()
@@ -478,6 +479,31 @@ class Handler(BaseHTTPRequestHandler):
             if path=="/api/backups": return self.send_json({"backups":list_backups()})
             if path=="/api/operation": return self.send_json(dict(operation))
             if path=="/api/ui-preferences": return self.send_json(installer_ui_preferences())
+            if path=="/api/faceplate-preview":
+                query=parse_qs(urlsplit(self.path).query)
+                name=query.get("name", [""])[0]
+                digest=query.get("sha", [""])[0]
+                if (not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,140}\.png", name)
+                        or not re.fullmatch(r"[a-f0-9]{64}", digest)):
+                    return self.send_error(400)
+                base=installer_core.WORK_DIR / "faceplate-previews"
+                target=base / digest / name
+                if (base.is_symlink() or target.parent.is_symlink()
+                        or target.is_symlink() or not target.is_file()
+                        or target.stat().st_size > 32 * 1024 * 1024):
+                    return self.send_error(404)
+                image=target.read_bytes()
+                if hashlib.sha256(image).hexdigest()!=digest:
+                    return self.send_error(404)
+                self.send_response(200)
+                self.send_header("Content-Type", "image/png")
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Security-Policy", "default-src 'none'")
+                self.send_header("Content-Length", str(len(image)))
+                self.end_headers()
+                self.wfile.write(image)
+                return
             filename="index.html" if path in {"/",""} else path.lstrip("/"); target=(WEB_ROOT/filename).resolve(); root=WEB_ROOT.resolve()
             if root not in target.parents and target!=root: return self.send_error(403)
             if not target.is_file(): return self.send_error(404)

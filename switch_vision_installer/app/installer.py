@@ -913,6 +913,7 @@ class InstallResult:
     required_actions: list[str]
     checksum: str
     completed_at: str
+    faceplate_changes: dict[str, Any] | None = None
 
 
 def load_options() -> dict[str, Any]:
@@ -1633,6 +1634,9 @@ def component_plan(root: Path, *, force: bool = False) -> tuple[list[tuple[Path,
 
 def install_release(root: Path, version: str, checksum: str, progress: Progress | None = None, *, force: bool = False) -> InstallResult:
     if progress: progress("Preparing forced Core reinstall…" if force else "Comparing installed components…", 48)
+    artwork_changes = _faceplate_history.faceplate_change_summary(
+        root, COMPONENT_DIR, FRONTEND_DIR
+    )
     changed, unchanged, _ = component_plan(root, force=force)
     backup = create_backup() if changed else None
     if backup is not None:
@@ -1664,7 +1668,11 @@ def install_release(root: Path, version: str, checksum: str, progress: Progress 
     actions=[]
     if "Custom component" in installed: actions.append("Restart Home Assistant Core")
     if "Dashboard frontend and visual assets" in installed: actions.append("Hard-refresh the browser if older frontend content remains")
-    result = InstallResult(True, version, str(backup) if backup else None, installed, unchanged, preserved, warnings, actions, checksum, datetime.now(timezone.utc).isoformat())
+    result = InstallResult(
+        True, version, str(backup) if backup else None, installed, unchanged,
+        preserved, warnings, actions, checksum, datetime.now(timezone.utc).isoformat(),
+        faceplate_changes=artwork_changes,
+    )
     STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
     STATE_PATH.write_text(json.dumps(asdict(result), indent=2) + "\n", encoding="utf-8")
     return result
@@ -1733,8 +1741,16 @@ def dry_run(progress: Progress | None = None) -> dict[str, Any]:
     try:
         changed, unchanged, missing = component_plan(root)
         custom_assets = collect_custom_assets()
+        artwork_changes = _faceplate_history.faceplate_change_summary(
+            root, COMPONENT_DIR, FRONTEND_DIR
+        )
+        preview_sha = _faceplate_history.stage_preflight_previews(
+            root, WORK_DIR / "faceplate-previews", artwork_changes
+        )
         plan = {
             "ok": True, "dry_run": True, "version": str(release["version"]),
+            "faceplate_preview_sha256": preview_sha,
+            "faceplate_changes": artwork_changes,
             "asset": release["asset_name"], "checksum": checksum,
             "checksum_verified": checksum_verified,
             "would_change": [label for _,_,label in changed],

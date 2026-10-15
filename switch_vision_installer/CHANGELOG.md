@@ -1,3 +1,9 @@
+## v2.1.59 — SHA-paired stock preflight and local review (Local)
+
+- Compare installed and incoming stock PNG plus one canonical factory geometry by actual SHA-256 during Core upgrade preparation; never archive unchanged pairs.
+- Keep previous verified image/geometry together in local SHA-identified history and preserve actively selected revisions across skipped upgrades.
+- Surface new dedicated stock artwork candidates and changed pairs in the Installer review card, retaining per-switch approval in Discovery Hub and leaving user Calibration untouched.
+
 ## v2.1.58 — Selected-old faceplate/geometry retention (Local)
 
 - Preserve only selected, digest-verified image-and-factory-geometry revisions that leave Core's capped bundle, inside the existing managed history area.
