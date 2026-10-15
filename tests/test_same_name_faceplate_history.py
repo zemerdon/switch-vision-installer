@@ -106,7 +106,7 @@ def test_catalogue_archives_unchanged_and_changed_stock_images() -> None:
         _image(incoming, name2, new2)
         stage = root / "stage"
         assert history.stage_history(incoming, component, existing, stage) == 1
-        assert (stage / "faceplate-history" / hashes[name1] / name1).read_bytes() == old1
+        assert not (stage / "faceplate-history" / hashes[name1] / name1).exists()
         assert (stage / "faceplate-history" / hashes[name2] / name2).read_bytes() == old2
         assert (stage / "faceplate-history" / "legacy" / name2).read_bytes() == old2
         # Repeated versions deduplicate unchanged originals.
@@ -114,7 +114,7 @@ def test_catalogue_archives_unchanged_and_changed_stock_images() -> None:
         copytree(stage / "faceplate-history", existing / "faceplate-history")
         again = root / "again"
         assert history.stage_history(incoming, component, existing, again) == 1
-        assert (again / "faceplate-history" / hashes[name1] / name1).read_bytes() == old1
+        assert not (again / "faceplate-history" / hashes[name1] / name1).exists()
 
 
 if __name__ == "__main__":

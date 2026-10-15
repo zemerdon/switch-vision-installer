@@ -1609,7 +1609,7 @@ def build_frontend_stage(root: Path, target: Path) -> None:
         if source.is_dir(): shutil.copytree(source, target / folder)
     # Preserve image revisions before atomic frontend replacement. An artwork
     # correction keeps its canonical filename and existing Calibration geometry.
-    _faceplate_history.stage_history(root, COMPONENT_DIR, FRONTEND_DIR, target)
+    _faceplate_history.stage_history(root, COMPONENT_DIR, FRONTEND_DIR, target, HA_CONFIG / ".storage/switch_vision_calibrations")
 
 
 def component_plan(root: Path, *, force: bool = False) -> tuple[list[tuple[Path, Path, str]], list[str], list[str]]:

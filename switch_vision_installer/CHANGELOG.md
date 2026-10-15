@@ -1,3 +1,9 @@
+## v2.1.58 — Selected-old faceplate/geometry retention (Local)
+
+- Preserve only selected, digest-verified image-and-factory-geometry revisions that leave Core's capped bundle, inside the existing managed history area.
+- Stop replacement if a pinned pair is missing/corrupt, and avoid copying unchanged stock PNGs into history on routine releases.
+- Keep per-switch choices and Calibration storage untouched, with no component upgrade ordering requirement.
+
 ## v2.1.57 — Bundled Core artwork revisions (Local)
 
 - Install the Core-shipped `faceplates-old` image/factory-geometry archive and manifest without requiring component updates in a fixed order.
