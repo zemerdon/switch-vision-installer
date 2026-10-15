@@ -1,3 +1,8 @@
+## v2.1.56 — Pre-upgrade artwork capture (Local)
+
+- Before replacing any Core files, record existing configured switch identities with exact verified outgoing/incoming stock image SHA-256 pairs in a private config file.
+- Keep archived PNG bytes in the existing holding directory; never persist credentials, reset Calibration or override a prior explicit selection.
+
 ## v2.1.55 — Verified stock faceplate holding catalog (Local)
 
 - Before replacing Core's stock images, preserve all manifest-verified outgoing faceplate PNGs in a content-addressed holding directory, including unchanged files.
