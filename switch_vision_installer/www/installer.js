@@ -198,7 +198,71 @@ function resultSummaryWithCoreRestart(r){
 }
 
 async function refresh(showLast=true){setControls(true);try{[currentStatus,currentRelease]=await Promise.all([json('api/status'),json('api/latest')]);renderState();if(showLast&&currentStatus.last_result)showResult(resultSummary(currentStatus.last_result),'success');else if(showLast)showResult('Ready.','muted');}catch(e){showResult(`Unable to check releases: ${esc(e.message)}`,'error');}finally{setControls(false);renderState();}}
-async function pollOperation(){showResult('Operation in progress…','muted');openActivitySection();clearInterval(pollTimer);$('progress').classList.remove('hidden');$('progress-text').classList.remove('hidden');setControls(true);pollTimer=setInterval(async()=>{try{const op=await json('api/operation');$('progress-bar').style.width=`${op.percent||0}%`;$('progress-text').textContent=op.message||'Working…';$('progress-stage').classList.remove('hidden');$('progress-stage').textContent=`${esc(op.kind||'operation')} — ${op.percent||0}%`;if(!op.active){clearInterval(pollTimer);restoreActivitySection();$('progress').classList.add('hidden');$('progress-text').classList.add('hidden');$('progress-stage').classList.add('hidden');if(op.error){window.svCoreUpgradePreflight='';window.svReviewFaceplatesAfterInstall=false;$('faceplate-review-section')?.classList.add('hidden');showResult(`Operation failed: ${esc(op.error)}`,'error');}else if(op.result){showResult(resultSummaryWithCoreRestart(op.result),'success');}await refresh(false);}}catch(e){clearInterval(pollTimer);restoreActivitySection();showResult(`Unable to read operation status: ${esc(e.message)}`,'error');setControls(false);}},700);}
+async function startPendingCoreUpdate(review=false){
+  const mode=String(window.svCoreUpgradePreflight||'');
+  if(mode!=='core'&&mode!=='all')return false;
+  window.svCoreUpgradePreflight='';
+  window.svReviewFaceplatesAfterInstall=Boolean(review);
+  const url=mode==='all'?'api/update-all':'api/update-component';
+  const options={method:'POST'};
+  if(mode==='core'){
+    options.headers={'Content-Type':'application/json'};
+    options.body=JSON.stringify({component:'core'});
+  }
+  for(const button of document.querySelectorAll('#faceplate-upgrade-keep,#faceplate-upgrade-review,#faceplate-upgrade-cancel')){
+    button.disabled=true;
+  }
+  try{
+    await json(url,options);
+    pollOperation();
+    return true;
+  }catch(error){
+    window.svReviewFaceplatesAfterInstall=false;
+    showResult('Core update could not start: '+esc(error.message),'error');
+    for(const button of document.querySelectorAll('#faceplate-upgrade-keep,#faceplate-upgrade-review,#faceplate-upgrade-cancel')){
+      button.disabled=false;
+    }
+    return false;
+  }
+}
+
+function corePreflightDecision(r){
+  // Malformed or missing comparisons fail closed: never silently skip an
+  // artwork approval step just because backend data was absent.
+  const c=r?.faceplate_changes;
+  if(!c||!Array.isArray(c.new)||!Array.isArray(c.changed))return 'invalid';
+  if(c.new.length||c.changed.length)return 'review';
+  if(!Array.isArray(r.preflight)||r.preflight.some(check=>check?.ok!==true))return 'advisory';
+  if(!Array.isArray(r.would_change))return 'invalid';
+  return r.would_change.length?'install':'current';
+}
+
+async function pollOperation(){showResult('Operation in progress…','muted');openActivitySection();clearInterval(pollTimer);$('progress').classList.remove('hidden');$('progress-text').classList.remove('hidden');setControls(true);pollTimer=setInterval(async()=>{try{const op=await json('api/operation');$('progress-bar').style.width=`${op.percent||0}%`;$('progress-text').textContent=op.message||'Working…';$('progress-stage').classList.remove('hidden');$('progress-stage').textContent=`${esc(op.kind||'operation')} — ${op.percent||0}%`;if(!op.active){clearInterval(pollTimer);restoreActivitySection();$('progress').classList.add('hidden');$('progress-text').classList.add('hidden');$('progress-stage').classList.add('hidden');if(op.error){window.svCoreUpgradePreflight='';window.svReviewFaceplatesAfterInstall=false;$('faceplate-review-section')?.classList.add('hidden');showResult(`Operation failed: ${esc(op.error)}`,'error');}else if(op.result){
+  const pending=String(window.svCoreUpgradePreflight||'');
+  if(op.result.dry_run&&(pending==='core'||pending==='all')){
+    const decision=corePreflightDecision(op.result);
+    if(decision==='install'){
+      showResult('Dry run passed. No faceplate artwork changes require review. Starting Core update…','muted');
+      await refresh(false);
+      await startPendingCoreUpdate(false);
+      return;
+    }
+    if(decision==='invalid'||decision==='advisory'){
+      window.svCoreUpgradePreflight='';
+      showResult((decision==='invalid'
+        ?'Core update was not started: the dry run did not return a complete artwork comparison and change plan.'
+        :'Core update was not started: one or more preflight checks need attention.')+
+        resultSummaryWithCoreRestart(op.result),'error');
+    }else if(decision==='current'){
+      window.svCoreUpgradePreflight='';
+      showResult('No managed Core files need updating.'+resultSummaryWithCoreRestart(op.result),'muted');
+    }else{
+      showResult(resultSummaryWithCoreRestart(op.result),'success');
+    }
+  }else{
+    showResult(resultSummaryWithCoreRestart(op.result),'success');
+  }
+}await refresh(false);}}catch(e){clearInterval(pollTimer);restoreActivitySection();showResult(`Unable to read operation status: ${esc(e.message)}`,'error');setControls(false);}},700);}
 $('close-changelog').addEventListener('click',()=>toggleChangelog(false));
 $('check').addEventListener('click',async()=>{setControls(true);try{await json('api/check-components',{method:'POST'});await refresh(false);showResult('Update check complete.','muted');}catch(e){showResult(`Unable to refresh component sources: ${esc(e.message)}`,'error');}finally{setControls(false);renderState();}});
 
@@ -219,26 +283,7 @@ $('faceplate-review-content').addEventListener('click',event=>{
     return;
   }
   if(keep||review){
-    const mode=String(window.svCoreUpgradePreflight||'');
-    if(mode!=='core'&&mode!=='all')return;
-    window.svCoreUpgradePreflight='';
-    window.svReviewFaceplatesAfterInstall=Boolean(review);
-    const url=mode==='all'?'api/update-all':'api/update-component';
-    const options={method:'POST'};
-    if(mode==='core'){
-      options.headers={'Content-Type':'application/json'};
-      options.body=JSON.stringify({component:'core'});
-    }
-    for(const button of document.querySelectorAll('#faceplate-upgrade-keep,#faceplate-upgrade-review,#faceplate-upgrade-cancel')){
-      button.disabled=true;
-    }
-    json(url,options).then(pollOperation).catch(error=>{
-      window.svReviewFaceplatesAfterInstall=false;
-      showResult('Core update could not start: '+esc(error.message),'error');
-      for(const button of document.querySelectorAll('#faceplate-upgrade-keep,#faceplate-upgrade-review,#faceplate-upgrade-cancel')){
-        button.disabled=false;
-      }
-    });
+    void startPendingCoreUpdate(Boolean(review));
     return;
   }
   if(event.target.closest('#faceplate-review-open')){

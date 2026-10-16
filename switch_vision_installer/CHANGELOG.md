@@ -1,3 +1,10 @@
+## v2.1.62 — Finish Core updates when stock artwork is unchanged (Local)
+
+- Fix a no-op Core Update experience: the faceplate SHA preflight completed but showed no approval actions when stock PNG and factory geometry were unchanged (for example Core 2.7.98 → 2.7.99).
+- After a successful preflight with complete empty artwork changes, passing checks and managed files to update, automatically start the already-requested Core installation. Core/Update All still require explicit artwork choice when a real faceplate difference exists.
+- Fail closed when artwork comparison, change plan or required checks are incomplete; never mistake missing comparison data for "no changes". Preserve saved artwork choices and Calibration, read-only preflight, and the explicit review path for changed stock artwork.
+- Add permanent independent regressions for no-change Core auto-continue, changed-artwork manual approval, malformed comparison, failed preflight, already-current and one-time update dispatch.
+
 ## v2.1.61 — Correct faceplate preview revisions and direct Hub navigation (Local)
 
 - Use verified previous and incoming SHA-256 values to version the Installer's preflight and post-update artwork image URLs, preventing same-filename stock faceplates from displaying the cached outgoing image twice.
