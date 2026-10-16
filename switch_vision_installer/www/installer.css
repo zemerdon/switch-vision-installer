@@ -19,6 +19,8 @@
   --button-secondary-bg:#1c3856;--button-secondary-text:#edf5fc;
   --button-danger-bg:#8b3540;--button-danger-text:#fff;
   --check-updates-bg:#147a34;--check-updates-bg-end:#08652b;--check-updates-hover:#166e32;--check-updates-border:#41b55c;--check-updates-text:#fff;
+  --faceplate-keep-top:#934608;--faceplate-keep-bottom:#713204;--faceplate-keep-hover-top:#9b4f10;--faceplate-keep-hover-bottom:#803a06;--faceplate-keep-border:#de8a35;
+  --faceplate-review-top:#147340;--faceplate-review-bottom:#08552e;--faceplate-review-hover-top:#177d43;--faceplate-review-hover-bottom:#0d6432;--faceplate-review-border:#40b875;
   --sv-body:16px;--sv-title:max(18px,1.83em);--sv-section:max(14px,1.2em);--sv-small:max(10px,.86em);
 }
 *{box-sizing:border-box}
@@ -245,3 +247,8 @@ body.density-ultra_dense .collapsible-content{padding:0 5px 4px}
 .config-actions{margin-top:4px}
 .config-state{margin:8px 0 0;padding:7px 9px;border-radius:8px;background:var(--surface-inset);color:var(--muted);font-size:var(--sv-small)}
 @media(max-width:720px){.config-grid{grid-template-columns:1fr}}
+
+/* Long dry-run inventories: use available Activity width without changing install plans. */
+.result .preserve-columns{columns:2;column-gap:32px}
+.result .preserve-columns li{break-inside:avoid;overflow-wrap:anywhere}
+@media(max-width:720px){.result .preserve-columns{columns:1}}

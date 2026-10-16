@@ -120,58 +120,70 @@ function renderState(){
     badge.textContent='Newer local build';badge.classList.add('neutral');
   }
 }
-function resultSummary(r){if(r.backup_created){return`<h3>Backup created successfully</h3><p><b>Backup:</b> ${esc(r.backup)}</p><p><b>Location:</b> <code>${esc(r.backup_path||'')}</code></p><p><b>Status:</b> ${r.verified?'Verified':'Not verified'}</p><p><b>Files checked:</b> ${esc(r.file_count||0)}</p>${r.version?`<p><b>Switch Vision version:</b> v${esc(r.version)}</p>`:''}${Number.isFinite(Number(r.configured_switches))?`<p><b>Discovery switches saved:</b> ${esc(r.configured_switches)}</p>`:''}`;}if(r.backup_validated){return`<h3>Backup validation passed</h3><p><b>Backup:</b> ${esc(r.backup)}</p><p><b>Status:</b> Verified</p><p><b>Files checked:</b> ${esc(r.file_count||0)}</p>`;}if(r.dry_run){const changes=(r.would_change||[]).map(x=>`<li>${esc(x)}</li>`).join(''),unchanged=(r.unchanged||[]).map(x=>`<li>${esc(x)}</li>`).join(''),preserve=(r.would_preserve||[]).map(x=>`<li>${esc(x)}</li>`).join(''),checks=(r.preflight||[]).map(x=>`<li><b>${esc(x.name)}:</b> ${x.ok?'Pass':'Advisory'} — ${esc(x.detail)}</li>`).join('');return`<h3>Dry run completed</h3><p>No files or settings were changed.</p><p><b>Target:</b> v${esc(r.version)}</p><p><b>SHA-256:</b> <code>${esc(r.checksum)}</code>${r.checksum_verified?' (verified against published checksum)':' (computed; no published checksum asset found)'}</p>${changes?`<p><b>Would change:</b></p><ul>${changes}</ul>`:'<p>No managed components would change.</p>'}${unchanged?`<p><b>Already current:</b></p><ul>${unchanged}</ul>`:''}${preserve?`<p><b>Would preserve:</b></p><ul>${preserve}</ul>`:''}<p><b>Backup:</b> ${r.would_create_backup?'Would be created and validated':'Not required'}</p>${checks?`<p><b>Preflight checks:</b></p><ul>${checks}</ul>`:''}`;}const installed=(r.installed||r.restored||[]).map(x=>`<li>${esc(x)}</li>`).join(''),skipped=(r.skipped||[]).map(x=>`<li>${esc(x)}</li>`).join(''),unchanged=(r.unchanged||[]).map(x=>`<li>${esc(x)}</li>`).join(''),preserved=(r.preserved||[]).map(x=>`<li>${esc(x)}</li>`).join(''),actions=(r.required_actions||[]).map(x=>`<li>${esc(x)}</li>`).join('');return`<h3>${r.restored?'Backup restored':'Operation completed successfully'}</h3>${r.version?`<p><b>Version:</b> v${esc(r.version)}</p>`:''}${r.backup?`<p><b>Backup:</b> ${esc(r.backup)}</p>`:''}${r.checksum?`<p><b>SHA-256:</b> <code>${esc(r.checksum)}</code></p>`:''}${installed?`<p><b>${r.restored?'Restored':'Changed'}:</b></p><ul>${installed}</ul>`:'<p>No managed component files required replacement.</p>'}${skipped?`<p><b>Skipped safely:</b></p><ul>${skipped}</ul>`:''}${unchanged?`<p><b>Already current:</b></p><ul>${unchanged}</ul>`:''}${preserved?`<p><b>Preserved custom assets:</b></p><ul>${preserved}</ul>`:''}${actions?`<p><b>Required next steps:</b></p><ol>${actions}</ol>`:''}`;}
+function resultSummary(r){if(r.backup_created){return`<h3>Backup created successfully</h3><p><b>Backup:</b> ${esc(r.backup)}</p><p><b>Location:</b> <code>${esc(r.backup_path||'')}</code></p><p><b>Status:</b> ${r.verified?'Verified':'Not verified'}</p><p><b>Files checked:</b> ${esc(r.file_count||0)}</p>${r.version?`<p><b>Switch Vision version:</b> v${esc(r.version)}</p>`:''}${Number.isFinite(Number(r.configured_switches))?`<p><b>Discovery switches saved:</b> ${esc(r.configured_switches)}</p>`:''}`;}if(r.backup_validated){return`<h3>Backup validation passed</h3><p><b>Backup:</b> ${esc(r.backup)}</p><p><b>Status:</b> Verified</p><p><b>Files checked:</b> ${esc(r.file_count||0)}</p>`;}if(r.dry_run){const changes=(r.would_change||[]).map(x=>`<li>${esc(x)}</li>`).join(''),unchanged=(r.unchanged||[]).map(x=>`<li>${esc(x)}</li>`).join(''),preserve=(r.would_preserve||[]).map(x=>`<li>${esc(x)}</li>`).join(''),checks=(r.preflight||[]).map(x=>`<li><b>${esc(x.name)}:</b> ${x.ok?'Pass':'Advisory'} — ${esc(x.detail)}</li>`).join('');return`<h3>Dry run completed</h3><p>No files or settings were changed.</p><p><b>Target:</b> v${esc(r.version)}</p><p><b>SHA-256:</b> <code>${esc(r.checksum)}</code>${r.checksum_verified?' (verified against published checksum)':' (computed; no published checksum asset found)'}</p>${changes?`<p><b>Would change:</b></p><ul>${changes}</ul>`:'<p>No managed components would change.</p>'}${unchanged?`<p><b>Already current:</b></p><ul>${unchanged}</ul>`:''}${preserve?`<p><b>Would preserve:</b></p><ul class="preserve-columns">${preserve}</ul>`:''}<p><b>Backup:</b> ${r.would_create_backup?'Would be created and validated':'Not required'}</p>${checks?`<p><b>Preflight checks:</b></p><ul>${checks}</ul>`:''}`;}const installed=(r.installed||r.restored||[]).map(x=>`<li>${esc(x)}</li>`).join(''),skipped=(r.skipped||[]).map(x=>`<li>${esc(x)}</li>`).join(''),unchanged=(r.unchanged||[]).map(x=>`<li>${esc(x)}</li>`).join(''),preserved=(r.preserved||[]).map(x=>`<li>${esc(x)}</li>`).join(''),actions=(r.required_actions||[]).map(x=>`<li>${esc(x)}</li>`).join('');return`<h3>${r.restored?'Backup restored':'Operation completed successfully'}</h3>${r.version?`<p><b>Version:</b> v${esc(r.version)}</p>`:''}${r.backup?`<p><b>Backup:</b> ${esc(r.backup)}</p>`:''}${r.checksum?`<p><b>SHA-256:</b> <code>${esc(r.checksum)}</code></p>`:''}${installed?`<p><b>${r.restored?'Restored':'Changed'}:</b></p><ul>${installed}</ul>`:'<p>No managed component files required replacement.</p>'}${skipped?`<p><b>Skipped safely:</b></p><ul>${skipped}</ul>`:''}${unchanged?`<p><b>Already current:</b></p><ul>${unchanged}</ul>`:''}${preserved?`<p><b>Preserved custom assets:</b></p><ul>${preserved}</ul>`:''}${actions?`<p><b>Required next steps:</b></p><ol>${actions}</ol>`:''}`;}
 
 function faceplateReviewCard(r){
   const changes=r?.faceplate_changes;
   const added=Array.isArray(changes?.new)?changes.new.filter(v=>/^[a-z0-9][a-z0-9_.-]{0,140}\.png$/i.test(v)):[];
   const altered=Array.isArray(changes?.changed)?changes.changed.filter(v=>
     v&&/^[a-z0-9][a-z0-9_.-]{0,140}\.png$/i.test(v.filename||'')):[];
-  if(!added.length&&!altered.length)return '';
-  const preview=(name, previousPath='', incomingSha='')=>{
+  if((!added.length&&!altered.length)||(r.dry_run&&!window.svCoreUpgradePreflight))return '';
+  const preview=(name,label,previousPath='',incomingSha='')=>{
+    let url='';
     if(r.dry_run && incomingSha){
       if(!/^[a-f0-9]{64}$/.test(incomingSha))return '';
-      return '<img alt="Incoming factory faceplate" loading="lazy" src="api/faceplate-preview?name='+
-        encodeURIComponent(name)+'&sha='+encodeURIComponent(incomingSha)+'">';
+      url='api/faceplate-preview?name='+encodeURIComponent(name)+'&sha='+encodeURIComponent(incomingSha);
+    }else{
+      const path=previousPath||'faceplates/'+name;
+      if(previousPath&&previousPath!==('faceplates/'+name)&&
+          !/^faceplate-history\/revisions\/sha\/[a-f0-9]{64}\/[a-z0-9][a-z0-9_.-]{0,140}\.png$/i.test(path))return '';
+      if(r.dry_run&&path.startsWith('faceplate-history/'))return '';
+      url='/local/switch-vision/'+path.split('/').map(encodeURIComponent).join('/');
     }
-    const path=previousPath||'faceplates/'+name;
-    if(previousPath && previousPath!==('faceplates/'+name) &&
-        !/^faceplate-history\/revisions\/sha\/[a-f0-9]{64}\/[a-z0-9][a-z0-9_.-]{0,140}\.png$/i.test(path))return '';
-    if(r.dry_run && previousPath && path.startsWith('faceplate-history/'))return '';
-    return '<img alt="Current factory faceplate" loading="lazy" src="/local/switch-vision/'+
-      path.split('/').map(encodeURIComponent).join('/')+'">';
+    return '<div class="faceplate-preview"><span class="faceplate-preview-label">'+esc(label)+'</span>'+
+      '<img alt="'+esc(label)+' — '+esc(name)+'" loading="lazy" src="'+url+'"></div>';
   };
   const changedRows=altered.map(v=>
-    '<div class="faceplate-review-row">'+
-    preview(v.filename,r.dry_run?'faceplates/'+v.filename:(v.previous_preview||''))+
-    preview(v.filename,'',r.dry_run?v.incoming_sha256:'')+
-    '<div><b>'+esc(v.filename)+'</b><p>'+
-    (v.geometry_only?'Factory geometry updated':'Stock artwork updated')+
-    ' · exact SHA-256 comparison</p></div></div>').join('');
+    '<div class="faceplate-review-row"><b>'+esc(v.filename)+'</b>'+
+    '<p>'+(v.geometry_only?'Factory geometry updated':'Stock artwork updated')+
+    ' · exact SHA-256 comparison</p>'+
+    preview(v.filename,'Current artwork',r.dry_run?'faceplates/'+v.filename:(v.previous_preview||''))+
+    preview(v.filename,'New artwork','',r.dry_run?v.incoming_sha256:'')+'</div>').join('');
   const addedRows=added.map(name=>
-    '<div class="faceplate-review-row">'+preview(name,'',r.dry_run?(r.faceplate_preview_sha256?.[name]||''):'')+
-    '<div><b>'+esc(name)+'</b><p>New dedicated faceplate candidate. '+
-    'Discovery determines which models use it.</p></div></div>').join('');
-  return '<section id="faceplate-review-card" class="faceplate-review-card" aria-label="Faceplate upgrades">'+
-    '<h3>Faceplate upgrade review</h3><p>'+
-    (r.dry_run?'These changes would become available after the Core upgrade.':
-     'These stock changes are installed. Existing switches retain their selected artwork until approved.')+
-    '</p>'+changedRows+addedRows+
-    '<p>Each switch can keep its current stock artwork or adopt its model’s new dedicated faceplate and matching geometry. '+
-    'Saved Calibration is not modified.</p>'+
-    '<div class="faceplate-review-actions"><button type="button" class="secondary" id="faceplate-review-dismiss">Keep current selections</button>'+
-    '<button type="button" id="faceplate-review-open">Review in Discovery Hub</button></div>'+
-    '</section>';
+    '<div class="faceplate-review-row"><b>'+esc(name)+'</b>'+
+    '<p>New dedicated faceplate candidate. Discovery determines which models use it.</p>'+
+    preview(name,'New artwork','',r.dry_run?(r.faceplate_preview_sha256?.[name]||''):'')+
+    '</div>').join('');
+  const pending=Boolean(r.dry_run&&window.svCoreUpgradePreflight);
+  const actions=pending?
+    '<div class="faceplate-review-actions">'+
+    '<button type="button" id="faceplate-upgrade-keep" class="faceplate-upgrade-keep">Keep current artwork &amp; update</button>'+
+    '<button type="button" id="faceplate-upgrade-review" class="faceplate-upgrade-review">Update &amp; review artwork</button>'+
+    '<button type="button" class="secondary" id="faceplate-upgrade-cancel">Cancel</button></div>':
+    '<div class="faceplate-review-actions"><button type="button" id="faceplate-review-open">Open Discovery App</button></div>';
+  return '<div class="faceplate-review-card">'+
+    '<p>'+(pending?'Review the artwork before installing Core. No changes have been made.':
+      'The stock artwork is installed. Existing switches keep their selected artwork until explicitly approved.')+'</p>'+
+    changedRows+addedRows+
+    '<p>Saved Calibration is not modified. Each switch can keep its current selection or explicitly approve new stock artwork in Discovery Hub.</p>'+
+    (pending?'':'<p>Open the Discovery app in Home Assistant, then enter Hub to review individual switches. Restart Home Assistant Core first if prompted by the update result.</p>')+
+    actions+'</div>';
+}
+function updateFaceplateReview(r){
+  const section=$('faceplate-review-section'),content=$('faceplate-review-content');
+  if(!section||!content)return;
+  const markup=faceplateReviewCard(r);
+  content.innerHTML=markup;
+  section.classList.toggle('hidden',!markup);
+  if(markup&&(r.dry_run||window.svReviewFaceplatesAfterInstall)){
+    section.scrollIntoView({behavior:'smooth',block:'start'});
+  }
+  if(!r.dry_run)window.svReviewFaceplatesAfterInstall=false;
 }
 const _baseResultSummary=resultSummary;
 resultSummary=function(r){
-  const review=faceplateReviewCard(r);
-  const pending=Boolean(r?.dry_run && window.svCoreUpgradePreflight);
-  const actions=pending ? '<div class="faceplate-review-actions">'+
-    '<button class="secondary" id="faceplate-upgrade-keep" type="button">Keep current artwork &amp; update</button>'+
-    '<button id="faceplate-upgrade-review" type="button">Update &amp; review new artwork</button>'+
-    '<button class="secondary" id="faceplate-upgrade-cancel" type="button">Cancel</button></div>' : '';
-  return _baseResultSummary(r)+review+actions;
+  updateFaceplateReview(r);
+  return _baseResultSummary(r);
 };
 
 function resultSummaryWithCoreRestart(r){
@@ -182,16 +194,23 @@ function resultSummaryWithCoreRestart(r){
 }
 
 async function refresh(showLast=true){setControls(true);try{[currentStatus,currentRelease]=await Promise.all([json('api/status'),json('api/latest')]);renderState();if(showLast&&currentStatus.last_result)showResult(resultSummary(currentStatus.last_result),'success');else if(showLast)showResult('Ready.','muted');}catch(e){showResult(`Unable to check releases: ${esc(e.message)}`,'error');}finally{setControls(false);renderState();}}
-async function pollOperation(){showResult('Operation in progress…','muted');openActivitySection();clearInterval(pollTimer);$('progress').classList.remove('hidden');$('progress-text').classList.remove('hidden');setControls(true);pollTimer=setInterval(async()=>{try{const op=await json('api/operation');$('progress-bar').style.width=`${op.percent||0}%`;$('progress-text').textContent=op.message||'Working…';$('progress-stage').classList.remove('hidden');$('progress-stage').textContent=`${esc(op.kind||'operation')} — ${op.percent||0}%`;if(!op.active){clearInterval(pollTimer);restoreActivitySection();$('progress').classList.add('hidden');$('progress-text').classList.add('hidden');$('progress-stage').classList.add('hidden');if(op.error){window.svCoreUpgradePreflight='';showResult(`Operation failed: ${esc(op.error)}`,'error');}else if(op.result){showResult(resultSummaryWithCoreRestart(op.result),'success');}await refresh(false);}}catch(e){clearInterval(pollTimer);restoreActivitySection();showResult(`Unable to read operation status: ${esc(e.message)}`,'error');setControls(false);}},700);}
+async function pollOperation(){showResult('Operation in progress…','muted');openActivitySection();clearInterval(pollTimer);$('progress').classList.remove('hidden');$('progress-text').classList.remove('hidden');setControls(true);pollTimer=setInterval(async()=>{try{const op=await json('api/operation');$('progress-bar').style.width=`${op.percent||0}%`;$('progress-text').textContent=op.message||'Working…';$('progress-stage').classList.remove('hidden');$('progress-stage').textContent=`${esc(op.kind||'operation')} — ${op.percent||0}%`;if(!op.active){clearInterval(pollTimer);restoreActivitySection();$('progress').classList.add('hidden');$('progress-text').classList.add('hidden');$('progress-stage').classList.add('hidden');if(op.error){window.svCoreUpgradePreflight='';window.svReviewFaceplatesAfterInstall=false;$('faceplate-review-section')?.classList.add('hidden');showResult(`Operation failed: ${esc(op.error)}`,'error');}else if(op.result){showResult(resultSummaryWithCoreRestart(op.result),'success');}await refresh(false);}}catch(e){clearInterval(pollTimer);restoreActivitySection();showResult(`Unable to read operation status: ${esc(e.message)}`,'error');setControls(false);}},700);}
 $('close-changelog').addEventListener('click',()=>toggleChangelog(false));
 $('check').addEventListener('click',async()=>{setControls(true);try{await json('api/check-components',{method:'POST'});await refresh(false);showResult('Update check complete.','muted');}catch(e){showResult(`Unable to refresh component sources: ${esc(e.message)}`,'error');}finally{setControls(false);renderState();}});
 
 $('result').addEventListener('click',event=>{
+  if(event.target.closest('#result-restart-core')){
+    requestComponentRestart('core','Home Assistant Core');
+  }
+});
+$('faceplate-review-content').addEventListener('click',event=>{
   const cancel=event.target.closest('#faceplate-upgrade-cancel');
   const keep=event.target.closest('#faceplate-upgrade-keep');
   const review=event.target.closest('#faceplate-upgrade-review');
   if(cancel){
     window.svCoreUpgradePreflight='';
+    $('faceplate-review-content').innerHTML='';
+    $('faceplate-review-section').classList.add('hidden');
     showResult('Core update cancelled. No files were changed.','muted');
     return;
   }
@@ -206,29 +225,26 @@ $('result').addEventListener('click',event=>{
       options.headers={'Content-Type':'application/json'};
       options.body=JSON.stringify({component:'core'});
     }
-    for(const button of document.querySelectorAll('#faceplate-upgrade-keep,#faceplate-upgrade-review')){
+    for(const button of document.querySelectorAll('#faceplate-upgrade-keep,#faceplate-upgrade-review,#faceplate-upgrade-cancel')){
       button.disabled=true;
     }
     json(url,options).then(pollOperation).catch(error=>{
       window.svReviewFaceplatesAfterInstall=false;
       showResult('Core update could not start: '+esc(error.message),'error');
+      for(const button of document.querySelectorAll('#faceplate-upgrade-keep,#faceplate-upgrade-review,#faceplate-upgrade-cancel')){
+        button.disabled=false;
+      }
     });
     return;
   }
-  if(event.target.closest('#result-restart-core')){
-    requestComponentRestart('core','Home Assistant Core');
-    return;
-  }
-  if(event.target.closest('#faceplate-review-dismiss')){
-    $('faceplate-review-card')?.remove();
-    return;
-  }
   if(event.target.closest('#faceplate-review-open')){
-    const entry=String(currentStatus?.discovery_ingress_entry||'');
-    if(entry.startsWith('/')&&!entry.startsWith('//')&&!entry.includes('..')){
+    // Home Assistant owns ingress tokens. Never open Supervisor ingress_entry
+    // directly: it may be stale or unusable in a fresh browser tab.
+    const entry=String(currentStatus?.discovery_details_path||'');
+    if(currentStatus?.discovery_installed&&/^\/config\/app\/[a-z0-9_-]+\/info$/i.test(entry)){
       window.open(entry,'_blank','noopener');
     }else{
-      showResult('Open Switch Vision Discovery from Home Assistant Apps to review individual switch faceplate upgrades.','muted');
+      showResult('Open Switch Vision Discovery from Home Assistant Settings → Apps, then open Hub to review artwork.','muted');
     }
   }
 });

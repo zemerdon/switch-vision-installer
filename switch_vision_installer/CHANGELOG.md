@@ -1,3 +1,11 @@
+## v2.1.60 — Dedicated faceplate review and readable Core preflight (Local)
+
+- Move verified SHA artwork comparison into its own responsive section above Activity, with current/new images stacked at full available width.
+- Present current-artwork Core update in an accessible orange gradient, and update-then-review in a green gradient; neither action changes a switch's saved Calibration or approves artwork automatically.
+- Use two-column desktop formatting for the Activity dry-run preservation inventory, reverting to one column on narrow screens without changing preflight, backups or file preservation.
+- Replace direct Supervisor ingress URLs that can return 404 in a new tab with Home Assistant's Discovery app navigation. Show the Hub review option after a successful installation, and retain explicit per-switch Hub approval.
+- Preserve read-only dry runs, explicit Core install initiation, verified original-and-geometry history, restart guidance and cancellation safeguards.
+
 ## v2.1.59 — SHA-paired stock preflight and local review (Local)
 
 - Compare installed and incoming stock PNG plus one canonical factory geometry by actual SHA-256 during Core upgrade preparation; never archive unchanged pairs.
