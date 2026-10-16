@@ -1800,6 +1800,9 @@ def status() -> dict[str, Any]:
         "discovery_ingress_entry": discovery.get("ingress_entry"),
         "discovery_webui": discovery.get("webui"),
         "discovery_details_path": f"/config/app/{discovery.get('slug')}/info" if discovery.get("slug") else None,
+        # Home Assistant app routes resolve fresh ingress sessions; never
+        # navigate to a Supervisor /api/hassio_ingress token in a new tab.
+        "discovery_hub_path": f"/app/{discovery.get('slug')}" if discovery.get("slug") else None,
         "snmp2mqtt_present": bool(snmp.get("present")),
         "snmp2mqtt_available": bool(snmp.get("available")),
         "snmp2mqtt_slug": snmp.get("slug"),

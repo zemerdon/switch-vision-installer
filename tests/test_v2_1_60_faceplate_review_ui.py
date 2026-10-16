@@ -27,12 +27,21 @@ assert 'id="faceplate-review-section" class="card faceplate-review-section hidde
 assert 'id="faceplate-review-content"' in html
 assert ".faceplate-preview img{display:block;width:100%;height:auto;" in css
 assert ".faceplate-preview-label{" in css
+assert ".faceplate-preview-label-current{" in css
+assert ".faceplate-preview-label-new{" in css
+assert "margin:0 auto 16px" in css
+assert ".faceplate-review-actions.is-hub{justify-content:center;" in css
+assert ".faceplate-hub-link{" in css
+assert "@keyframes faceplate-hub-border-glow{" in css
+assert "@media(prefers-reduced-motion:reduce){.faceplate-hub-link{animation:none}}" in css
 assert ".faceplate-review-actions button:focus-visible{" in css
 assert "@media(max-width:560px){.faceplate-review-actions{flex-direction:column}" in css
 assert ".result .preserve-columns{columns:2;" in activity
 assert "@media(max-width:720px){.result .preserve-columns{columns:1}}" in activity
 assert 'class="preserve-columns"' in js
-assert "currentStatus?.discovery_details_path" in js
+assert "currentStatus?.discovery_hub_path" in js
+backend = (root.parent / "app" / "installer.py").read_text()
+assert '"discovery_hub_path": f"/app/{discovery.get(\'slug\')}"' in backend
 assert "currentStatus?.discovery_ingress_entry" not in js
 assert "window.open(entry,'_blank','noopener')" in js
 assert "r.dry_run&&!window.svCoreUpgradePreflight" in js
@@ -62,7 +71,7 @@ const end=source.indexOf('function resultSummaryWithCoreRestart(r){',start);
 a(start>=0&&end>start);
 const el={innerHTML:'',classList:{hidden:true,toggle(_,v){this.hidden=v},add(){this.hidden=true}},
   scrollIntoView(){this.scrolled=true},addEventListener(_,fn){this.click=fn}};
-const status={discovery_installed:true,discovery_details_path:'/config/app/local_switch_vision_discovery/info'};
+const status={discovery_installed:true,discovery_hub_path:'/app/local_switch_vision_discovery'};
 let opened='',notice='';
 const ctx={window:{svCoreUpgradePreflight:'core',svReviewFaceplatesAfterInstall:false,
   open:(v,where,rel)=>{opened=v;a.equal(where,'_blank');a.equal(rel,'noopener')}},
@@ -74,20 +83,30 @@ vm.createContext(ctx);
 vm.runInContext(source.slice(start,end),ctx);
 const name='cisco-3850-12xs.png';
 const item={filename:name,incoming_sha256:'a'.repeat(64),
- previous_preview:'faceplate-history/revisions/sha/'+'b'.repeat(64)+'/'+name};
+ previous_sha256:'b'.repeat(64), previous_preview:'faceplate-history/revisions/sha/'+'b'.repeat(64)+'/'+name};
 const dry={dry_run:true,faceplate_changes:{changed:[item],new:[]}};
 a.equal(ctx.resultSummary(dry),'<p>activity</p>');
 a.equal(el.classList.hidden,false);
 a.equal((el.innerHTML.match(/<img /g)||[]).length,2);
-a.equal((el.innerHTML.match(/faceplate-preview-label/g)||[]).length,2);
+a.equal((el.innerHTML.match(/class="faceplate-preview-label /g)||[]).length,2);
 a(el.innerHTML.includes('Current artwork')&&el.innerHTML.includes('New artwork'));
+a(el.innerHTML.includes('faceplate-preview-label-current'));
+a(el.innerHTML.includes('faceplate-preview-label-new'));
 a(el.innerHTML.includes('id="faceplate-upgrade-keep"'));
 a(el.innerHTML.includes('id="faceplate-upgrade-review"'));
+a(el.innerHTML.includes('faceplates/'+name+'?sha='+'b'.repeat(64)));
+a(el.innerHTML.includes('api/faceplate-preview?name='+name+'&sha='+'a'.repeat(64)));
 a(!el.innerHTML.includes('id="faceplate-review-open"'));
 ctx.window.svCoreUpgradePreflight='';
 ctx.window.svReviewFaceplatesAfterInstall=true;
 ctx.resultSummary({...dry,dry_run:false});
 a(el.innerHTML.includes('id="faceplate-review-open"'));
+a(el.innerHTML.includes('Open Switch Vision Hub'));
+a(el.innerHTML.includes('faceplate-review-actions is-hub'));
+a(el.innerHTML.includes('faceplate-hub-link'));
+a(el.innerHTML.includes('faceplate-history/revisions/sha/'+'b'.repeat(64)+'/'+name+'?sha='+'b'.repeat(64)));
+a(el.innerHTML.includes('faceplates/'+name+'?sha='+'a'.repeat(64)));
+a(!el.innerHTML.includes('faceplates/'+name+'\"'));
 a(!el.innerHTML.includes('faceplate-upgrade-keep'));
 a(el.scrolled);
 a.equal(ctx.window.svReviewFaceplatesAfterInstall,false);
@@ -97,12 +116,12 @@ a(s>0&&e>s);
 vm.runInContext(source.slice(s,e),ctx);
 function click(id){el.click({target:{closest:sel=>sel===id?{}:null}})}
 click('#faceplate-review-open');
-a.equal(opened,'/config/app/local_switch_vision_discovery/info');
+a.equal(opened,'/app/local_switch_vision_discovery');
 opened='';
-status.discovery_details_path='/api/hassio_ingress/stale';
+status.discovery_hub_path='/api/hassio_ingress/stale';
 click('#faceplate-review-open');
 a.equal(opened,'');
-a.match(notice,/Home Assistant Settings/);
+a.match(notice,/Home Assistant sidebar/);
 let request=null;
 ctx.json=(url,options)=>{request={url,options};return {then:fn=>{fn();return {catch:()=>{}}}}};
 ctx.pollOperation=()=>{};

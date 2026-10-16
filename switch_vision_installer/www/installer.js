@@ -128,27 +128,31 @@ function faceplateReviewCard(r){
   const altered=Array.isArray(changes?.changed)?changes.changed.filter(v=>
     v&&/^[a-z0-9][a-z0-9_.-]{0,140}\.png$/i.test(v.filename||'')):[];
   if((!added.length&&!altered.length)||(r.dry_run&&!window.svCoreUpgradePreflight))return '';
-  const preview=(name,label,previousPath='',incomingSha='')=>{
+  const preview=(name,label,previousPath='',artworkSha='')=>{
     let url='';
-    if(r.dry_run && incomingSha){
-      if(!/^[a-f0-9]{64}$/.test(incomingSha))return '';
-      url='api/faceplate-preview?name='+encodeURIComponent(name)+'&sha='+encodeURIComponent(incomingSha);
+    // A same-name stock PNG changes after Core install: version every image
+    // request by its verified SHA so the browser never reuses old art.
+    if(artworkSha && !/^[a-f0-9]{64}$/.test(artworkSha))return '';
+    if(r.dry_run && artworkSha && !previousPath){
+      url='api/faceplate-preview?name='+encodeURIComponent(name)+'&sha='+encodeURIComponent(artworkSha);
     }else{
       const path=previousPath||'faceplates/'+name;
       if(previousPath&&previousPath!==('faceplates/'+name)&&
           !/^faceplate-history\/revisions\/sha\/[a-f0-9]{64}\/[a-z0-9][a-z0-9_.-]{0,140}\.png$/i.test(path))return '';
       if(r.dry_run&&path.startsWith('faceplate-history/'))return '';
-      url='/local/switch-vision/'+path.split('/').map(encodeURIComponent).join('/');
+      url='/local/switch-vision/'+path.split('/').map(encodeURIComponent).join('/')+
+        (artworkSha?'?sha='+encodeURIComponent(artworkSha):'');
     }
-    return '<div class="faceplate-preview"><span class="faceplate-preview-label">'+esc(label)+'</span>'+
+    const labelClass=label==='Current artwork'?'faceplate-preview-label-current':'faceplate-preview-label-new';
+    return '<div class="faceplate-preview"><span class="faceplate-preview-label '+labelClass+'">'+esc(label)+'</span>'+
       '<img alt="'+esc(label)+' — '+esc(name)+'" loading="lazy" src="'+url+'"></div>';
   };
   const changedRows=altered.map(v=>
     '<div class="faceplate-review-row"><b>'+esc(v.filename)+'</b>'+
     '<p>'+(v.geometry_only?'Factory geometry updated':'Stock artwork updated')+
     ' · exact SHA-256 comparison</p>'+
-    preview(v.filename,'Current artwork',r.dry_run?'faceplates/'+v.filename:(v.previous_preview||''))+
-    preview(v.filename,'New artwork','',r.dry_run?v.incoming_sha256:'')+'</div>').join('');
+    preview(v.filename,'Current artwork',r.dry_run?'faceplates/'+v.filename:(v.previous_preview||''),v.previous_sha256)+
+    preview(v.filename,'New artwork','',v.incoming_sha256)+'</div>').join('');
   const addedRows=added.map(name=>
     '<div class="faceplate-review-row"><b>'+esc(name)+'</b>'+
     '<p>New dedicated faceplate candidate. Discovery determines which models use it.</p>'+
@@ -160,13 +164,13 @@ function faceplateReviewCard(r){
     '<button type="button" id="faceplate-upgrade-keep" class="faceplate-upgrade-keep">Keep current artwork &amp; update</button>'+
     '<button type="button" id="faceplate-upgrade-review" class="faceplate-upgrade-review">Update &amp; review artwork</button>'+
     '<button type="button" class="secondary" id="faceplate-upgrade-cancel">Cancel</button></div>':
-    '<div class="faceplate-review-actions"><button type="button" id="faceplate-review-open">Open Discovery App</button></div>';
+    '<div class="faceplate-review-actions is-hub"><button type="button" id="faceplate-review-open" class="faceplate-hub-link">Open Switch Vision Hub <span aria-hidden="true">↗</span></button></div>';
   return '<div class="faceplate-review-card">'+
     '<p>'+(pending?'Review the artwork before installing Core. No changes have been made.':
       'The stock artwork is installed. Existing switches keep their selected artwork until explicitly approved.')+'</p>'+
     changedRows+addedRows+
     '<p>Saved Calibration is not modified. Each switch can keep its current selection or explicitly approve new stock artwork in Discovery Hub.</p>'+
-    (pending?'':'<p>Open the Discovery app in Home Assistant, then enter Hub to review individual switches. Restart Home Assistant Core first if prompted by the update result.</p>')+
+    (pending?'':'<p>Open Switch Vision Hub to review individual switches. Restart Home Assistant Core first if prompted by the update result.</p>')+
     actions+'</div>';
 }
 function updateFaceplateReview(r){
@@ -240,11 +244,11 @@ $('faceplate-review-content').addEventListener('click',event=>{
   if(event.target.closest('#faceplate-review-open')){
     // Home Assistant owns ingress tokens. Never open Supervisor ingress_entry
     // directly: it may be stale or unusable in a fresh browser tab.
-    const entry=String(currentStatus?.discovery_details_path||'');
-    if(currentStatus?.discovery_installed&&/^\/config\/app\/[a-z0-9_-]+\/info$/i.test(entry)){
+    const entry=String(currentStatus?.discovery_hub_path||'');
+    if(currentStatus?.discovery_installed&&/^\/app\/[a-z0-9_-]+$/i.test(entry)){
       window.open(entry,'_blank','noopener');
     }else{
-      showResult('Open Switch Vision Discovery from Home Assistant Settings → Apps, then open Hub to review artwork.','muted');
+      showResult('Switch Vision Hub could not be opened directly. Open it from the Home Assistant sidebar after confirming Discovery is installed.','muted');
     }
   }
 });

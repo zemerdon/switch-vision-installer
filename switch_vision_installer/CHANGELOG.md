@@ -1,3 +1,10 @@
+## v2.1.61 — Correct faceplate preview revisions and direct Hub navigation (Local)
+
+- Use verified previous and incoming SHA-256 values to version the Installer's preflight and post-update artwork image URLs, preventing same-filename stock faceplates from displaying the cached outgoing image twice.
+- Rename the review action **Open Switch Vision Hub** and target Home Assistant's installed Discovery app route, not its settings page or an expired Supervisor ingress token.
+- Apply centred large amber/emerald soft-neon headings to the full-width artwork comparisons, and centre a cyan-outline **Open Switch Vision Hub** button with gentle border pulse (disabled for reduced-motion users); neither heading resembles a destructive/reset action.
+- Retain the preservation controls, explicit per-switch Hub approval and saved Calibration safety, with permanent regression coverage.
+
 ## v2.1.60 — Dedicated faceplate review and readable Core preflight (Local)
 
 - Move verified SHA artwork comparison into its own responsive section above Activity, with current/new images stacked at full available width.

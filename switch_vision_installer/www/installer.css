@@ -21,6 +21,9 @@
   --check-updates-bg:#147a34;--check-updates-bg-end:#08652b;--check-updates-hover:#166e32;--check-updates-border:#41b55c;--check-updates-text:#fff;
   --faceplate-keep-top:#934608;--faceplate-keep-bottom:#713204;--faceplate-keep-hover-top:#9b4f10;--faceplate-keep-hover-bottom:#803a06;--faceplate-keep-border:#de8a35;
   --faceplate-review-top:#147340;--faceplate-review-bottom:#08552e;--faceplate-review-hover-top:#177d43;--faceplate-review-hover-bottom:#0d6432;--faceplate-review-border:#40b875;
+  --faceplate-heading-orange:#ffd18b;--faceplate-heading-orange-border:#cc893c;--faceplate-heading-orange-soft:rgba(249,160,59,.2);--faceplate-heading-orange-inset:rgba(222,121,26,.12);--faceplate-heading-orange-bg:#261d18;
+  --faceplate-heading-green:#a4f9ce;--faceplate-heading-green-border:#3ec982;--faceplate-heading-green-soft:rgba(66,217,140,.21);--faceplate-heading-green-inset:rgba(22,167,95,.1);--faceplate-heading-green-bg:#102720;
+  --faceplate-hub-cyan:#bceeff;--faceplate-hub-border:#56c9f2;--faceplate-hub-border-glow:#9ae9ff;--faceplate-hub-top:#102d47;--faceplate-hub-bottom:#0a1e31;--faceplate-hub-glow:rgba(89,215,255,.58);--faceplate-hub-inset:rgba(36,157,195,.2);
   --sv-body:16px;--sv-title:max(18px,1.83em);--sv-section:max(14px,1.2em);--sv-small:max(10px,.86em);
 }
 *{box-sizing:border-box}
