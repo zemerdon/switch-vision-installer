@@ -1,3 +1,9 @@
+## v2.1.63 — Normal Core updates; faceplates belong to Hub (Local)
+
+- Remove the Faceplate Upgrade Review section, image previews, artwork acceptance buttons, pulsing Hub shortcut, special dry-run decisions and related Installer CSS/JavaScript. Core Update and Update All now start their standard installation operations directly, as with other components.
+- Following the normal Core update and Home Assistant Core restart, Discovery Hub alone discovers and offers newer verified Native stock faceplates. Installer does not approve or reset faceplate selections.
+- Preserve exact-source Core install integrity, managed-file preservation, backup and rollback safeguards and the normal restart guidance. Dedicated regressions verify normal component routing and absence of the removed UI.
+
 ## v2.1.62 — Finish Core updates when stock artwork is unchanged (Local)
 
 - Fix a no-op Core Update experience: the faceplate SHA preflight completed but showed no approval actions when stock PNG and factory geometry were unchanged (for example Core 2.7.98 → 2.7.99).

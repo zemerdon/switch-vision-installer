@@ -14,30 +14,3 @@
 .component-manager-note{margin-top:12px;color:var(--muted);font-size:.9em}
 @media(max-width:1150px){.managed-component{grid-template-columns:minmax(0,1fr) auto}.managed-component-actions{grid-column:1/-1;justify-content:flex-start}}
 @media(max-width:560px){.managed-component{grid-template-columns:minmax(0,1fr)}.managed-component-state{justify-self:start}.managed-component-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.managed-component-actions button{min-width:0;white-space:normal}}
-
-/* Faceplate comparisons live above Activity; installation does not approve artwork. */
-.faceplate-review-section{min-width:0}
-.faceplate-review-card p{margin:6px 0 12px}
-.faceplate-review-row{min-width:0;border-top:1px solid var(--line);padding:14px 0}
-.faceplate-review-row:first-of-type{border-top:0}
-.faceplate-review-row b{overflow-wrap:anywhere}
-.faceplate-preview{margin-top:12px;min-width:0}
-.faceplate-preview-label{display:table;margin:0 auto 16px;padding:12px 24px;border:1px solid;border-radius:10px;font-size:clamp(1.12rem,1.8vw,1.5rem);line-height:1.25;font-weight:800;letter-spacing:.2px;text-align:center;max-width:100%}
-.faceplate-preview-label-current{color:var(--faceplate-heading-orange);border-color:var(--faceplate-heading-orange-border);background:var(--faceplate-heading-orange-bg);box-shadow:0 0 15px var(--faceplate-heading-orange-soft),inset 0 0 16px var(--faceplate-heading-orange-inset)}
-.faceplate-preview-label-new{color:var(--faceplate-heading-green);border-color:var(--faceplate-heading-green-border);background:var(--faceplate-heading-green-bg);box-shadow:0 0 15px var(--faceplate-heading-green-soft),inset 0 0 16px var(--faceplate-heading-green-inset)}
-.faceplate-preview img{display:block;width:100%;height:auto;object-fit:contain;background:var(--surface-inset);border-radius:7px}
-.faceplate-review-actions{display:flex;flex-wrap:wrap;gap:10px;padding-top:12px}
-.faceplate-review-actions.is-hub{justify-content:center;padding:20px 0 5px}
-.faceplate-hub-link{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:48px;padding:12px 24px;border:1px solid var(--faceplate-hub-border);border-radius:10px;background:linear-gradient(180deg,var(--faceplate-hub-top),var(--faceplate-hub-bottom));color:var(--faceplate-hub-cyan);font-size:1rem;font-weight:800;box-shadow:inset 0 0 14px var(--faceplate-hub-inset);animation:faceplate-hub-border-glow 3.2s ease-in-out infinite}
-.faceplate-hub-link:hover{color:var(--on-primary);border-color:var(--faceplate-hub-border-glow)}
-.faceplate-hub-link:focus-visible{outline:2px solid var(--heading-strong);outline-offset:3px;animation:none}
-@keyframes faceplate-hub-border-glow{0%,100%{border-color:var(--faceplate-hub-border);box-shadow:0 0 4px var(--faceplate-hub-inset),inset 0 0 12px var(--faceplate-hub-inset)}50%{border-color:var(--faceplate-hub-border-glow);box-shadow:0 0 19px var(--faceplate-hub-glow),inset 0 0 16px var(--faceplate-hub-inset)}}
-@media(prefers-reduced-motion:reduce){.faceplate-hub-link{animation:none}}
-.faceplate-review-actions button{min-height:42px}
-.faceplate-upgrade-keep{background:linear-gradient(180deg,var(--faceplate-keep-top),var(--faceplate-keep-bottom));border:1px solid var(--faceplate-keep-border);color:var(--on-primary);box-shadow:inset 0 1px 0 rgba(255,255,255,.14)}
-.faceplate-upgrade-keep:hover{background:linear-gradient(180deg,var(--faceplate-keep-hover-top),var(--faceplate-keep-hover-bottom))}
-.faceplate-upgrade-review{background:linear-gradient(180deg,var(--faceplate-review-top),var(--faceplate-review-bottom));border:1px solid var(--faceplate-review-border);color:var(--on-primary);box-shadow:inset 0 1px 0 rgba(255,255,255,.14)}
-.faceplate-upgrade-review:hover{background:linear-gradient(180deg,var(--faceplate-review-hover-top),var(--faceplate-review-hover-bottom))}
-.faceplate-review-actions button:focus-visible{outline:2px solid var(--heading-strong);outline-offset:2px}
-.faceplate-review-actions button:disabled{opacity:.45}
-@media(max-width:560px){.faceplate-review-actions{flex-direction:column}.faceplate-review-actions button{width:100%}}
