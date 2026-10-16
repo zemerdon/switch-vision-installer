@@ -9,7 +9,7 @@ import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "switch_vision_installer/app"))
-from faceplate_history import compare_sha_pairs, preserve_sha_pairs, faceplate_change_summary, stage_preflight_previews
+from faceplate_history import compare_sha_pairs, preserve_sha_pairs, faceplate_change_summary
 
 
 def digest(data):
@@ -124,24 +124,6 @@ class SHAHistoryTests(unittest.TestCase):
             self.assertEqual(before["changed"], [])
             self.assertEqual(preserve_sha_pairs(new, component, old, stage), [])
             self.assertFalse((stage / "faceplate-history").exists())
-
-    def test_verified_preflight_image_previews_are_disposable_and_sha_bound(self):
-        with TemporaryDirectory() as td:
-            base = Path(td)
-            original, updated = base / "original", base / "updated"
-            component = release(original, b"generic", 10)
-            release(updated, b"new-stock", 20)
-            summary = faceplate_change_summary(updated, component, original)
-            expected = summary["changed"][0]["incoming_sha256"]
-            cache = base / "previews"
-            previews = stage_preflight_previews(updated, cache, summary)
-            self.assertEqual(previews, {"example.png": expected})
-            self.assertEqual((cache / expected / "example.png").read_bytes(), b"new-stock")
-            self.assertEqual((original / "faceplates/example.png").read_bytes(), b"generic")
-            self.assertEqual(stage_preflight_previews(updated, cache, summary), previews)
-            (updated / "faceplates/example.png").write_bytes(b"tampered")
-            with self.assertRaisesRegex(RuntimeError, "verify faceplate preview"):
-                stage_preflight_previews(updated, cache, summary)
 
     def test_tamper_blocks_pair_preservation(self):
         with TemporaryDirectory() as td:

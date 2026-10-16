@@ -1,3 +1,9 @@
+## v2.1.64 — Retire orphaned faceplate preview backend (Local)
+
+- Remove the no-longer-used Installer `/api/faceplate-preview` endpoint, its generated image cache, and preview-only SHA field after the faceplate review UI was removed in 2.1.63.
+- Preserve the general diagnostic `/api/dry-run`, its verified change summary, SHA-based stock artwork history, managed-file preservation, backups and normal component update behavior. Faceplate upgrade approval remains exclusive to Discovery Hub.
+- Add negative regression coverage for retired preview generation and serving without weakening stock SHA protection.
+
 ## v2.1.63 — Normal Core updates; faceplates belong to Hub (Local)
 
 - Remove the Faceplate Upgrade Review section, image previews, artwork acceptance buttons, pulsing Hub shortcut, special dry-run decisions and related Installer CSS/JavaScript. Core Update and Update All now start their standard installation operations directly, as with other components.

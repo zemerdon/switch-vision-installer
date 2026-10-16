@@ -1744,12 +1744,8 @@ def dry_run(progress: Progress | None = None) -> dict[str, Any]:
         artwork_changes = _faceplate_history.faceplate_change_summary(
             root, COMPONENT_DIR, FRONTEND_DIR
         )
-        preview_sha = _faceplate_history.stage_preflight_previews(
-            root, WORK_DIR / "faceplate-previews", artwork_changes
-        )
         plan = {
             "ok": True, "dry_run": True, "version": str(release["version"]),
-            "faceplate_preview_sha256": preview_sha,
             "faceplate_changes": artwork_changes,
             "asset": release["asset_name"], "checksum": checksum,
             "checksum_verified": checksum_verified,
