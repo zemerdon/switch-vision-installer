@@ -1,3 +1,7 @@
+## v2.1.69 — Reuse version snapshot for release metadata (Local)
+
+- Stop re-fetching the same public version for OCI and repository-backed release metadata on component refresh. Keep update decisions tied to the original status snapshot, avoid stale metadata across version changes, and preserve independent lookups and failure reporting.
+
 ## v2.1.68 — Reuse status within component actions (Local)
 
 - Reuse the verified status snapshot within each changelog and reinstall action, avoiding duplicate Supervisor lookups while retaining live pre-reinstall details and independent refresh behavior.

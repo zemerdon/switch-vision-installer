@@ -288,7 +288,9 @@ def _oci_image_metadata(spec: ComponentSpec, version: str) -> dict[str, Any]:
     }
 
 
-def _repository_current_metadata(spec: ComponentSpec, repository: str) -> dict[str, Any]:
+def _repository_current_metadata(
+    spec: ComponentSpec, repository: str, *, version: str | None = None
+) -> dict[str, Any]:
     payload = _github_request(
         f"https://api.github.com/repos/zemerdon/{repository}/commits/main"
     )
@@ -297,7 +299,8 @@ def _repository_current_metadata(spec: ComponentSpec, repository: str) -> dict[s
     committed_at = str(payload.get("commit", {}).get("committer", {}).get("date") or "").strip()
     if not committed_at:
         raise RuntimeError("repository current metadata has no commit timestamp")
-    version = _remote_version(spec)
+    if version is None:
+        version = _remote_version(spec)
     if not version:
         raise RuntimeError("repository current metadata has no current version")
     return {
@@ -308,7 +311,9 @@ def _repository_current_metadata(spec: ComponentSpec, repository: str) -> dict[s
     }
 
 
-def _public_release_metadata(spec: ComponentSpec) -> dict[str, Any]:
+def _public_release_metadata(
+    spec: ComponentSpec, *, current_version: str | None = None
+) -> dict[str, Any]:
     """Return presentation metadata from the component's actual authority.
 
     Version resolution remains authoritative for install/update decisions. This
@@ -317,7 +322,12 @@ def _public_release_metadata(spec: ComponentSpec) -> dict[str, Any]:
     """
     repository = resolve_repository(spec)
     now = time.monotonic()
+    # Current versions are owned by the component status snapshot. A refresh
+    # must not re-fetch its public config or reuse old metadata after a version
+    # changes. Direct standalone lookups retain their independent resolution.
     cache_key = f"{spec.publication_authority}:{repository}"
+    if spec.publication_authority != "github_release":
+        cache_key = f"{cache_key}:{current_version}"
     cached = _PUBLIC_RELEASE_CACHE.get(cache_key)
     if cached and now - cached[0] < PUBLIC_RELEASE_CACHE_SECONDS:
         return dict(cached[1])
@@ -326,12 +336,12 @@ def _public_release_metadata(spec: ComponentSpec) -> dict[str, Any]:
         if spec.publication_authority == "github_release":
             result = _github_release_metadata(repository)
         elif spec.publication_authority == "oci_image":
-            version = _remote_version(spec)
+            version = _remote_version(spec) if current_version is None else current_version
             if not version:
                 raise RuntimeError("OCI image source has no current semantic version")
             result = _oci_image_metadata(spec, version)
         elif spec.publication_authority == "repository_current":
-            result = _repository_current_metadata(spec, repository)
+            result = _repository_current_metadata(spec, repository, version=current_version)
         else:
             raise RuntimeError(f"unknown publication authority: {spec.publication_authority}")
         result["release_metadata_error"] = None
@@ -517,7 +527,9 @@ def component_status_with_releases() -> dict[str, Any]:
     for row in snapshot["components"]:
         spec = by_id.get(str(row.get("id") or ""))
         if spec is not None:
-            row.update(_public_release_metadata(spec))
+            row.update(_public_release_metadata(
+                spec, current_version=str(row.get("latest_version") or "")
+            ))
     return snapshot
 
 

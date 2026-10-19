@@ -171,8 +171,8 @@ def base_status():
         "components": [dict(row) for row in base_snapshot["components"]],
     }
 module.component_status = base_status
-def public_release_stub(spec):
-    release_components.append(spec.component_id)
+def public_release_stub(spec, *, current_version=None):
+    release_components.append((spec.component_id, current_version))
     return {
         "public_release_version": "9.9.9",
         "public_release_published_at": "2026-09-06T12:34:56Z",
@@ -181,7 +181,7 @@ def public_release_stub(spec):
     }
 module._public_release_metadata = public_release_stub
 enriched = module.component_status_with_releases()
-assert release_components == order
+assert release_components == [(row["id"], str(row.get("latest_version") or "")) for row in base_snapshot["components"]]
 assert [row["id"] for row in enriched["components"]] == order
 assert all(row["public_release_version"] == "9.9.9" for row in enriched["components"])
 assert all(
