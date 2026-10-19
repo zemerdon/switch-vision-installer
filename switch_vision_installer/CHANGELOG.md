@@ -1,3 +1,9 @@
+## v2.1.65 — Share MQTT-app repository registration lifecycle (Local)
+
+- Replace the independent SNMP2MQTT and UniFi2MQTT repository-registration, Supervisor race reconciliation, store refresh and availability-wait loops with one reviewed Installer owner; keep their public entrypoints, repository identity, progress text, errors and unchanged saved options.
+- Remove the duplicate SNMP2MQTT repository lookup. Leave Discovery's distinct repository identity and store-app verification rules untouched.
+- Exercise each app's already-available, newly registered, existing, duplicate-race, failed registration and unavailable-store paths with isolated fakes; preserve all previous update and backup behavior.
+
 ## v2.1.64 — Retire orphaned faceplate preview backend (Local)
 
 - Remove the no-longer-used Installer `/api/faceplate-preview` endpoint, its generated image cache, and preview-only SHA field after the faceplate review UI was removed in 2.1.63.

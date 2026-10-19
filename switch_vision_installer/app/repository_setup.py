@@ -28,71 +28,68 @@ def _repository_list() -> list[dict[str, Any]]:
     return [item for item in data if isinstance(item, dict)]
 
 
-def _repository_entry() -> dict[str, Any] | None:
-    expected = _normalise_repo_url(SNMP2MQTT_REPOSITORY)
-    for item in _repository_list():
-        for key in ("source", "url"):
-            if _normalise_repo_url(item.get(key)) == expected:
-                return item
-    return None
-
-
 # v2.1.30: SNMP2MQTT 0.9.18 restores `homeassistant` as a real user
 # configuration section. Repository setup must never rewrite SNMP2MQTT saved
 # options: the app wrapper owns effective defaults/migration and preserves
 # credentials plus deliberate target-mode choices.
 
-def _wait_for_snmp2mqtt(timeout: int = 120) -> str:
+def _wait_for_repository_app(
+    find_slug: Callable[..., str], product: str, timeout: int = 120,
+) -> str:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
-            return installer_core.find_snmp2mqtt_slug(include_store=True)
+            return find_slug(include_store=True)
         except Exception:
             time.sleep(2)
     raise RuntimeError(
-        "Switch Vision SNMP2MQTT repository is registered, but the app did not become available "
+        f"Switch Vision {product} repository is registered, but the app did not become available "
         "in the Home Assistant store within 120 seconds."
     )
 
 
-def ensure_snmp2mqtt_repository(progress: Progress | None = None) -> dict[str, Any]:
-    """Ensure the official Switch Vision SNMP2MQTT App repository is registered."""
-    # v2.1.30: preserve every saved SNMP2MQTT option verbatim. The restored
-    # Home Assistant section is valid again and effective required defaults are
-    # enforced inside the SNMP2MQTT wrapper, not by Installer mutation.
+def _ensure_repository_app(
+    repository: str,
+    product: str,
+    find_slug: Callable[..., str],
+    progress: Progress | None = None,
+) -> dict[str, Any]:
+    """Register one already-supported MQTT app without changing saved options."""
     try:
-        slug = installer_core.find_snmp2mqtt_slug(include_store=True)
-        return {"added": False, "available": True, "slug": slug, "repository": SNMP2MQTT_REPOSITORY}
+        slug = find_slug(include_store=True)
+        return {"added": False, "available": True, "slug": slug, "repository": repository}
     except Exception:
         pass
 
-    existing = _repository_entry()
     added = False
-    if existing is None:
+    if _repository_entry_for(repository) is None:
         if progress:
-            progress("Adding the Switch Vision SNMP2MQTT App repository…", 3)
+            progress(f"Adding the Switch Vision {product} App repository…", 3)
         try:
             installer_core.supervisor_request(
                 "/store/repositories",
                 method="POST",
-                payload={"repository": SNMP2MQTT_REPOSITORY},
+                payload={"repository": repository},
             )
             added = True
         except Exception:
-            # A duplicate can be returned if another request registered the repo first.
-            if _repository_entry() is None:
+            # Supervisor can race with another repository registration request.
+            if _repository_entry_for(repository) is None:
                 raise
 
     if progress:
         progress("Refreshing the Home Assistant App store…", 4)
     installer_core.reload_addon_store()
-    slug = _wait_for_snmp2mqtt()
-    return {
-        "added": added,
-        "available": True,
-        "slug": slug,
-        "repository": SNMP2MQTT_REPOSITORY,
-    }
+    slug = _wait_for_repository_app(find_slug, product)
+    return {"added": added, "available": True, "slug": slug, "repository": repository}
+
+
+def ensure_snmp2mqtt_repository(progress: Progress | None = None) -> dict[str, Any]:
+    """Preserve SNMP2MQTT options; only register/refresh its repository."""
+    return _ensure_repository_app(
+        SNMP2MQTT_REPOSITORY, "SNMP2MQTT",
+        installer_core.find_snmp2mqtt_slug, progress,
+    )
 
 def _repository_entry_for(repository: str) -> dict[str, Any] | None:
     expected = _normalise_repo_url(repository)
@@ -103,52 +100,12 @@ def _repository_entry_for(repository: str) -> dict[str, Any] | None:
     return None
 
 
-def _wait_for_unifi2mqtt(timeout: int = 120) -> str:
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        try:
-            return installer_core.find_unifi2mqtt_slug(include_store=True)
-        except Exception:
-            time.sleep(2)
-    raise RuntimeError(
-        "Switch Vision UniFi2MQTT repository is registered, but the app did not become available "
-        "in the Home Assistant store within 120 seconds."
-    )
-
-
 def ensure_unifi2mqtt_repository(progress: Progress | None = None) -> dict[str, Any]:
-    try:
-        slug = installer_core.find_unifi2mqtt_slug(include_store=True)
-        return {"added": False, "available": True, "slug": slug, "repository": UNIFI2MQTT_REPOSITORY}
-    except Exception:
-        pass
-
-    existing = _repository_entry_for(UNIFI2MQTT_REPOSITORY)
-    added = False
-    if existing is None:
-        if progress:
-            progress("Adding the Switch Vision UniFi2MQTT App repository…", 3)
-        try:
-            installer_core.supervisor_request(
-                "/store/repositories",
-                method="POST",
-                payload={"repository": UNIFI2MQTT_REPOSITORY},
-            )
-            added = True
-        except Exception:
-            if _repository_entry_for(UNIFI2MQTT_REPOSITORY) is None:
-                raise
-
-    if progress:
-        progress("Refreshing the Home Assistant App store…", 4)
-    installer_core.reload_addon_store()
-    slug = _wait_for_unifi2mqtt()
-    return {
-        "added": added,
-        "available": True,
-        "slug": slug,
-        "repository": UNIFI2MQTT_REPOSITORY,
-    }
+    """Preserve UniFi2MQTT options; only register/refresh its repository."""
+    return _ensure_repository_app(
+        UNIFI2MQTT_REPOSITORY, "UniFi2MQTT",
+        installer_core.find_unifi2mqtt_slug, progress,
+    )
 
 def _store_addons() -> list[dict[str, Any]]:
     payload = installer_core.supervisor_request("/store")
