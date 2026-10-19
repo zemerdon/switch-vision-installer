@@ -96,4 +96,37 @@ assert payload["settings_restored"] is True
 assert payload["running_state_restored"] is True
 assert payload["version"] == "3.0.5"
 
+# A user-requested reinstall must reuse the status already checked by its
+# outer entrypoint, instead of querying Supervisor again in _addon_reinstall.
+status_calls = []
+validated = {
+    "installed": True, "slug": "repo_switch_vision_discovery",
+    "dependency_ok": True, "latest_version": "3.0.5",
+}
+def status_once(spec):
+    status_calls.append(spec.component_id)
+    return validated
+manager._component_status = status_once
+manager._addon_reinstall = lambda component_id, progress=None, *, status=None: {
+    "component_reinstall": component_id, "verified_snapshot": status,
+}
+reused = manager.reinstall_component("discovery")
+assert status_calls == ["discovery"], status_calls
+assert reused["verified_snapshot"] is validated
+
+# Changelog displays latest and installed versions from the same status read.
+manager._spec = lambda component_id: SimpleNamespace(
+    component_id=component_id, label="Switch Vision Discovery",
+    kind="addon", changelog_path="switch_vision_discovery/CHANGELOG.md",
+)
+manager.resolve_repository = lambda spec: "switch-vision-discovery"
+manager._raw_text = lambda repository, path: "## Changelog fixture"
+status_calls.clear()
+validated.update({"latest_version": "3.0.5", "installed_version": "3.0.4"})
+changelog = manager.component_changelog("discovery")
+assert status_calls == ["discovery"], status_calls
+assert changelog["latest_version"] == "3.0.5"
+assert changelog["installed_version"] == "3.0.4"
+assert changelog["changelog"] == "## Changelog fixture"
+print("Installer one-status-per-reinstall/changelog request: PASS")
 print("Installer v2.1.42 per-component reinstall controls: PASS")

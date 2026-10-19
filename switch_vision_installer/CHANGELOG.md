@@ -1,3 +1,7 @@
+## v2.1.68 — Reuse status within component actions (Local)
+
+- Reuse the verified status snapshot within each changelog and reinstall action, avoiding duplicate Supervisor lookups while retaining live pre-reinstall details and independent refresh behavior.
+
 ## v2.1.67 — Reuse Supervisor status lists (Local)
 
 - Reuse installed-app and store lists during one component refresh, avoiding redundant Supervisor requests. Individual app operations remain fresh; unavailable Supervisor status still fails closed.

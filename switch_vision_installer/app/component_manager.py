@@ -539,13 +539,14 @@ def component_changelog(component_id: str) -> dict[str, Any]:
             text = "No changelog source is configured for this component."
         else:
             text = _raw_text(repository, spec.changelog_path)
+    status = _component_status(spec)
     return {
         "id": spec.component_id,
         "label": spec.label,
         "repository": f"https://github.com/zemerdon/{repository}",
         "changelog": text,
-        "latest_version": _component_status(spec).get("latest_version"),
-        "installed_version": _component_status(spec).get("installed_version"),
+        "latest_version": status.get("latest_version"),
+        "installed_version": status.get("installed_version"),
     }
 
 
@@ -692,12 +693,13 @@ def _addon_update(component_id: str, progress: Progress | None = None) -> dict[s
         "component_update": component_id,
     }
 
-def _addon_reinstall(component_id: str, progress: Progress | None = None) -> dict[str, Any]:
+def _addon_reinstall(component_id: str, progress: Progress | None = None, *, status: dict[str, Any] | None = None) -> dict[str, Any]:
     """Reinstall one repository-backed app while preserving user configuration."""
     _set_repository_compatibility()
     spec = _spec(component_id)
     expected_version = installer_core.normalise_version(_remote_version(spec))
-    status = _component_status(spec)
+    if status is None:
+        status = _component_status(spec)
     if not status.get("installed"):
         return _addon_update(component_id, progress)
 
@@ -814,7 +816,7 @@ def reinstall_component(component_id: str, progress: Progress | None = None) -> 
             "component_reinstall": "installer",
             "self_reinstall_external": True,
         }
-    return _addon_reinstall(component_id, progress)
+    return _addon_reinstall(component_id, progress, status=status)
 
 
 def _installer_slug() -> str:
