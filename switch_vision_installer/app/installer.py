@@ -253,13 +253,27 @@ def ensure_switch_vision_config_entry() -> dict[str, Any]:
     }
 
 
-def find_discovery_slug(include_store: bool = False) -> str:
-    addon = _find_addon(
-        lambda slug, name: (
+def _matches_switch_vision_app(component: str, slug: str, name: str) -> bool:
+    """Preserve Discovery's stricter identity and each MQTT app's legacy aliases."""
+    if component == "discovery":
+        return (
             slug.endswith("switch_vision_discovery")
             or "switch-vision-discovery" in slug
             or name == "switch vision discovery"
-        ),
+        )
+    if component not in {"snmp2mqtt", "unifi2mqtt"}:
+        raise ValueError(f"Unsupported Switch Vision app identity: {component}")
+    return (
+        f"switch_vision_{component}" in slug
+        or f"switch-vision-{component}" in slug
+        or name == f"switch vision {component}"
+        or ("switch vision" in name and component in name)
+    )
+
+
+def find_discovery_slug(include_store: bool = False) -> str:
+    addon = _find_addon(
+        lambda slug, name: _matches_switch_vision_app("discovery", slug, name),
         include_store=include_store,
         fail_on_unavailable=True,
     )
@@ -600,9 +614,10 @@ def _find_addon(
     include_store: bool = False,
     *,
     fail_on_unavailable: bool = False,
+    store_only: bool = False,
 ) -> dict[str, Any] | None:
-    endpoints = ["/addons"]
-    if include_store:
+    endpoints = ["/store"] if store_only else ["/addons"]
+    if include_store and not store_only:
         endpoints.append("/store")
     successful_queries = 0
     last_error: Exception | None = None
@@ -629,60 +644,64 @@ def _find_addon(
     return None
 
 
-def discovery_status() -> dict[str, Any]:
-    installed_addon = _find_addon(
-        lambda slug, name: (
-            slug.endswith("switch_vision_discovery")
-            or "switch-vision-discovery" in slug
-            or name == "switch vision discovery"
-        ),
-        include_store=False,
-        fail_on_unavailable=True,
-    )
-    store_addon = _find_addon(
-        lambda slug, name: (
-            slug.endswith("switch_vision_discovery")
-            or "switch-vision-discovery" in slug
-            or name == "switch vision discovery"
-        ),
-        include_store=True,
-    )
-    if installed_addon:
-        slug = str(installed_addon.get("slug", ""))
+def _repository_addon_status(
+    component: str,
+    directory: Path,
+    *,
+    directory_key: str,
+) -> dict[str, Any]:
+    """One Supervisor status owner; preserve component-specific response keys."""
+    match = lambda slug, name: _matches_switch_vision_app(component, slug, name)
+    installed = _find_addon(match, fail_on_unavailable=True)
+    present = directory.is_dir()
+    if installed:
+        slug = str(installed.get("slug", ""))
         try:
-            info_payload = supervisor_request(f"/addons/{slug}/info")
-            info = info_payload.get("data", {})
+            info = supervisor_request(f"/addons/{slug}/info").get("data", {})
         except Exception:
-            info = installed_addon
-        return {
-            "files_present": DISCOVERY_DIR.is_dir(),
+            info = installed
+        result: dict[str, Any] = {
+            directory_key: present,
             "available": True,
             "installed": True,
             "slug": slug,
-            "version": info.get("version") or info.get("version_latest") or installed_addon.get("version"),
-            "state": info.get("state") or installed_addon.get("state") or "unknown",
-            "ingress_entry": info.get("ingress_entry") or installed_addon.get("ingress_entry"),
-            "webui": info.get("webui") or installed_addon.get("webui"),
+            "version": info.get("version") or info.get("version_latest") or installed.get("version"),
+            "state": info.get("state") or installed.get("state") or "unknown",
         }
-    return {
-        "files_present": DISCOVERY_DIR.is_dir(),
-        "available": bool(store_addon) or DISCOVERY_DIR.is_dir(),
-        "installed": False,
-        "slug": str(store_addon.get("slug", "")) if store_addon else None,
-        "version": store_addon.get("version") if store_addon else None,
-        "state": "not_installed",
-        "ingress_entry": None,
-        "webui": None,
-    }
+        if component != "snmp2mqtt":
+            result["ingress_entry"] = info.get("ingress_entry") or installed.get("ingress_entry")
+            result["webui"] = info.get("webui") or installed.get("webui")
+    else:
+        # Installed lookup already checked /addons. Avoid querying it again.
+        store = _find_addon(match, store_only=True)
+        result = {
+            directory_key: present,
+            "available": bool(store) or present,
+            "installed": False,
+            "slug": str(store.get("slug", "")) if store else None,
+            "version": (
+                (store.get("version") or (
+                    store.get("version_latest") if component != "discovery" else None
+                )) if store else None
+            ),
+            "state": "not_installed",
+        }
+    if component == "snmp2mqtt":
+        result["generated_yaml"] = GENERATED_SNMP2MQTT_YAML.is_file()
+    if not installed:
+        result["ingress_entry"] = None
+        result["webui"] = None
+    return result
+
+
+def discovery_status() -> dict[str, Any]:
+    return _repository_addon_status(
+        "discovery", DISCOVERY_DIR, directory_key="files_present",
+    )
 
 def find_snmp2mqtt_slug(include_store: bool = False) -> str:
     addon = _find_addon(
-        lambda slug, name: (
-            "switch_vision_snmp2mqtt" in slug
-            or "switch-vision-snmp2mqtt" in slug
-            or name == "switch vision snmp2mqtt"
-            or ("switch vision" in name and "snmp2mqtt" in name)
-        ),
+        lambda slug, name: _matches_switch_vision_app("snmp2mqtt", slug, name),
         include_store=include_store,
         fail_on_unavailable=True,
     )
@@ -709,62 +728,14 @@ def set_snmp2mqtt_options(options: dict[str, Any]) -> None:
     supervisor_request(f"/addons/{slug}/options", method="POST", payload={"options": options})
 
 def snmp2mqtt_status() -> dict[str, Any]:
-    installed_addon = _find_addon(
-        lambda slug, name: (
-            "switch_vision_snmp2mqtt" in slug
-            or "switch-vision-snmp2mqtt" in slug
-            or name == "switch vision snmp2mqtt"
-            or ("switch vision" in name and "snmp2mqtt" in name)
-        ),
-        include_store=False,
-        fail_on_unavailable=True,
+    return _repository_addon_status(
+        "snmp2mqtt", SNMP2MQTT_DIR, directory_key="present",
     )
-    store_addon = _find_addon(
-        lambda slug, name: (
-            "switch_vision_snmp2mqtt" in slug
-            or "switch-vision-snmp2mqtt" in slug
-            or name == "switch vision snmp2mqtt"
-            or ("switch vision" in name and "snmp2mqtt" in name)
-        ),
-        include_store=True,
-    )
-    if installed_addon:
-        slug = str(installed_addon.get("slug", ""))
-        try:
-            info_payload = supervisor_request(f"/addons/{slug}/info")
-            info = info_payload.get("data", {})
-        except Exception:
-            info = installed_addon
-        return {
-            "present": SNMP2MQTT_DIR.is_dir(),
-            "available": True,
-            "installed": True,
-            "slug": slug,
-            "version": info.get("version") or info.get("version_latest") or installed_addon.get("version"),
-            "state": info.get("state") or installed_addon.get("state") or "unknown",
-            "generated_yaml": GENERATED_SNMP2MQTT_YAML.is_file(),
-        }
-    return {
-        "present": SNMP2MQTT_DIR.is_dir(),
-        "available": bool(store_addon) or SNMP2MQTT_DIR.is_dir(),
-        "installed": False,
-        "slug": str(store_addon.get("slug", "")) if store_addon else None,
-        "version": store_addon.get("version") or store_addon.get("version_latest") if store_addon else None,
-        "state": "not_installed",
-        "generated_yaml": GENERATED_SNMP2MQTT_YAML.is_file(),
-        "ingress_entry": None,
-        "webui": None,
-    }
 
 
 def find_unifi2mqtt_slug(include_store: bool = False) -> str:
     addon = _find_addon(
-        lambda slug, name: (
-            "switch_vision_unifi2mqtt" in slug
-            or "switch-vision-unifi2mqtt" in slug
-            or name == "switch vision unifi2mqtt"
-            or ("switch vision" in name and "unifi2mqtt" in name)
-        ),
+        lambda slug, name: _matches_switch_vision_app("unifi2mqtt", slug, name),
         include_store=include_store,
         fail_on_unavailable=True,
     )
@@ -813,41 +784,9 @@ def set_unifi2mqtt_options(options: dict[str, Any]) -> None:
 
 
 def unifi2mqtt_status() -> dict[str, Any]:
-    match = lambda slug, name: (
-        "switch_vision_unifi2mqtt" in slug
-        or "switch-vision-unifi2mqtt" in slug
-        or name == "switch vision unifi2mqtt"
-        or ("switch vision" in name and "unifi2mqtt" in name)
+    return _repository_addon_status(
+        "unifi2mqtt", UNIFI2MQTT_DIR, directory_key="present",
     )
-    installed_addon = _find_addon(match, include_store=False, fail_on_unavailable=True)
-    store_addon = _find_addon(match, include_store=True)
-    if installed_addon:
-        slug = str(installed_addon.get("slug", ""))
-        try:
-            info_payload = supervisor_request(f"/addons/{slug}/info")
-            info = info_payload.get("data", {})
-        except Exception:
-            info = installed_addon
-        return {
-            "present": UNIFI2MQTT_DIR.is_dir(),
-            "available": True,
-            "installed": True,
-            "slug": slug,
-            "version": info.get("version") or info.get("version_latest") or installed_addon.get("version"),
-            "state": info.get("state") or installed_addon.get("state") or "unknown",
-            "ingress_entry": info.get("ingress_entry") or installed_addon.get("ingress_entry"),
-            "webui": info.get("webui") or installed_addon.get("webui"),
-        }
-    return {
-        "present": UNIFI2MQTT_DIR.is_dir(),
-        "available": bool(store_addon) or UNIFI2MQTT_DIR.is_dir(),
-        "installed": False,
-        "slug": str(store_addon.get("slug", "")) if store_addon else None,
-        "version": (store_addon.get("version") or store_addon.get("version_latest")) if store_addon else None,
-        "state": "not_installed",
-        "ingress_entry": None,
-        "webui": None,
-    }
 
 
 def reload_addon_store() -> None:

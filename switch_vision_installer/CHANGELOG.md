@@ -1,3 +1,7 @@
+## v2.1.66 — Consolidate Supervisor app status (Local)
+
+- Use one status and identity implementation for Discovery, SNMP2MQTT and UniFi2MQTT, preserving their individual metadata, availability and fail-closed behavior while avoiding redundant Supervisor status requests.
+
 ## v2.1.65 — Share MQTT-app repository registration lifecycle (Local)
 
 - Replace the independent SNMP2MQTT and UniFi2MQTT repository-registration, Supervisor race reconciliation, store refresh and availability-wait loops with one reviewed Installer owner; keep their public entrypoints, repository identity, progress text, errors and unchanged saved options.
