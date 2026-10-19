@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 from fnmatch import fnmatch
@@ -609,6 +611,21 @@ def configured_switch_count(options: dict[str, Any] | None) -> int:
     return 0
 
 
+_STATUS_LISTS: ContextVar[dict[str, dict[str, Any]] | None] = ContextVar(
+    "switch_vision_installer_status_lists", default=None,
+)
+
+
+@contextmanager
+def shared_supervisor_lists():
+    """Reuse read-only Supervisor lists within one component-status refresh."""
+    token = _STATUS_LISTS.set({})
+    try:
+        yield
+    finally:
+        _STATUS_LISTS.reset(token)
+
+
 def _find_addon(
     predicate: Callable[[str, str], bool],
     include_store: bool = False,
@@ -623,7 +640,13 @@ def _find_addon(
     last_error: Exception | None = None
     for endpoint in endpoints:
         try:
-            payload = supervisor_request(endpoint)
+            lists = _STATUS_LISTS.get()
+            if lists is not None and endpoint in lists:
+                payload = lists[endpoint]
+            else:
+                payload = supervisor_request(endpoint)
+                if lists is not None:
+                    lists[endpoint] = payload
         except Exception as exc:
             last_error = exc
             continue

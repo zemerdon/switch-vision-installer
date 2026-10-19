@@ -4,6 +4,7 @@ from pathlib import Path
 import importlib.util
 import sys
 import types
+from contextlib import nullcontext
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "switch_vision_installer" / "app"
@@ -18,6 +19,7 @@ fake_installer.discovery_status = lambda: {"installed": True, "version": "2.1.34
 fake_installer.snmp2mqtt_status = lambda: {"installed": True, "version": "0.9.15", "state": "started", "slug": "repo_snmp"}
 fake_installer.unifi2mqtt_status = lambda: {"installed": False, "version": None, "state": "not_installed", "slug": "repo_unifi"}
 fake_installer._find_addon = lambda *args, **kwargs: {"slug": "repo_installer"}
+fake_installer.shared_supervisor_lists = nullcontext
 fake_installer.download_and_install = lambda progress=None: types.SimpleNamespace(__dict__={"ok": True, "version": "2.4.8", "installed": [], "unchanged": ["Core"], "warnings": [], "required_actions": []})
 sys.modules["installer"] = fake_installer
 

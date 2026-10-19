@@ -155,4 +155,50 @@ assert mod._matches_switch_vision_app(
     "snmp2mqtt", "legacy-switch-vision-snmp2mqtt", ""
 )
 print("Installer shared status response and Supervisor query contracts: PASS")
+# Reuse installed/store lists inside one UI refresh, not across refreshes.
+calls = []
+def listing(path, method="GET", payload=None, *, timeout=30.0):
+    calls.append(path)
+    if path == "/addons":
+        return {"data": {"addons": [
+            {"slug": "repo_switch_vision_discovery", "version": "1.0.0"},
+            {"slug": "repo_switch_vision_installer"},
+        ]}}
+    if path == "/store":
+        return {"data": {"addons": []}}
+    if path.endswith("/info"):
+        return {"data": {"version": "1.0.0"}}
+    raise AssertionError(path)
+
+mod.supervisor_request = listing
+with mod.shared_supervisor_lists():
+    assert mod.discovery_status()["installed"] is True
+    assert mod.snmp2mqtt_status()["installed"] is False
+    assert mod.unifi2mqtt_status()["installed"] is False
+    assert mod._find_addon(lambda slug, _: slug.endswith("switch_vision_installer"))
+assert calls.count("/addons") == 1 and calls.count("/store") == 1, calls
+mod.discovery_status()
+assert calls.count("/addons") == 2, calls
+# Installed-only refresh needs no store request; the scope never leaks.
+calls.clear()
+def all_installed(path, method="GET", payload=None, *, timeout=30.0):
+    calls.append(path)
+    if path == "/addons":
+        return {"data": {"addons": [
+            {"slug": f"repo_switch_vision_{component}"}
+            for component in ("discovery", "snmp2mqtt", "unifi2mqtt", "installer")
+        ]}}
+    if path.endswith("/info"):
+        return {"data": {"version": "1.0.0"}}
+    raise AssertionError("unexpected store request: " + path)
+mod.supervisor_request = all_installed
+with mod.shared_supervisor_lists():
+    for status in (mod.discovery_status, mod.snmp2mqtt_status, mod.unifi2mqtt_status):
+        assert status()["installed"] is True
+assert calls.count("/addons") == 1, calls
+assert "/store" not in calls
+mod.discovery_status()
+assert calls.count("/addons") == 2, calls
+print("Installer scoped Supervisor list reuse regression: PASS")
+
 print("Installer v2.1.47 Supervisor status fail-closed regression: PASS")

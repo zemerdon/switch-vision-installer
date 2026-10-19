@@ -472,7 +472,8 @@ def _component_status(spec: ComponentSpec) -> dict[str, Any]:
 
 
 def component_status() -> dict[str, Any]:
-    rows = [_component_status(spec) for spec in COMPONENTS]
+    with installer_core.shared_supervisor_lists():
+        rows = [_component_status(spec) for spec in COMPONENTS]
     by_id = {row["id"]: row for row in rows}
     actionable = [
         row for row in rows

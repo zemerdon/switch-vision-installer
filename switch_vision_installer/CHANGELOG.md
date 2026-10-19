@@ -1,3 +1,7 @@
+## v2.1.67 — Reuse Supervisor status lists (Local)
+
+- Reuse installed-app and store lists during one component refresh, avoiding redundant Supervisor requests. Individual app operations remain fresh; unavailable Supervisor status still fails closed.
+
 ## v2.1.66 — Consolidate Supervisor app status (Local)
 
 - Use one status and identity implementation for Discovery, SNMP2MQTT and UniFi2MQTT, preserving their individual metadata, availability and fail-closed behavior while avoiding redundant Supervisor status requests.
