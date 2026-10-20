@@ -1,24 +1,8 @@
-## v2.1.69 — Reuse version snapshot for release metadata (Local)
+## v2.1.69 — Faster, simpler component status and updates
 
-- Stop re-fetching the same public version for OCI and repository-backed release metadata on component refresh. Keep update decisions tied to the original status snapshot, avoid stale metadata across version changes, and preserve independent lookups and failure reporting.
-
-## v2.1.68 — Reuse status within component actions (Local)
-
-- Reuse the verified status snapshot within each changelog and reinstall action, avoiding duplicate Supervisor lookups while retaining live pre-reinstall details and independent refresh behavior.
-
-## v2.1.67 — Reuse Supervisor status lists (Local)
-
-- Reuse installed-app and store lists during one component refresh, avoiding redundant Supervisor requests. Individual app operations remain fresh; unavailable Supervisor status still fails closed.
-
-## v2.1.66 — Consolidate Supervisor app status (Local)
-
-- Use one status and identity implementation for Discovery, SNMP2MQTT and UniFi2MQTT, preserving their individual metadata, availability and fail-closed behavior while avoiding redundant Supervisor status requests.
-
-## v2.1.65 — Share MQTT-app repository registration lifecycle (Local)
-
-- Replace the independent SNMP2MQTT and UniFi2MQTT repository-registration, Supervisor race reconciliation, store refresh and availability-wait loops with one reviewed Installer owner; keep their public entrypoints, repository identity, progress text, errors and unchanged saved options.
-- Remove the duplicate SNMP2MQTT repository lookup. Leave Discovery's distinct repository identity and store-app verification rules untouched.
-- Exercise each app's already-available, newly registered, existing, duplicate-race, failed registration and unavailable-store paths with isolated fakes; preserve all previous update and backup behavior.
+- Consolidate the SNMP2MQTT and UniFi2MQTT Home Assistant repository-registration lifecycle while preserving distinct app identities, race recovery and fail-closed handling.
+- Share reviewed Supervisor app-status resolution and reuse installed/store-list results within one status refresh instead of repeating equivalent requests.
+- Reuse each action's verified status and version snapshots for changelog, reinstall and release metadata; preserve independent fresh updates, settings, backup/rollback behavior and unavailable-service safeguards.
 
 ## v2.1.64 — Retire orphaned faceplate preview backend (Local)
 
