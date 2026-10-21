@@ -1,36 +1,41 @@
+## v2.1.70 — Clear customer-facing component history
+
+- Remove internal development-stage labels from earlier changelog headings while retaining each version's functional release history.
+- Preserve component updates, saved faceplate revisions, Supervisor integration, backups and rollback behavior.
+
 ## v2.1.69 — Faster, simpler component status and updates
 
 - Consolidate the SNMP2MQTT and UniFi2MQTT Home Assistant repository-registration lifecycle while preserving distinct app identities, race recovery and fail-closed handling.
 - Share reviewed Supervisor app-status resolution and reuse installed/store-list results within one status refresh instead of repeating equivalent requests.
 - Reuse each action's verified status and version snapshots for changelog, reinstall and release metadata; preserve independent fresh updates, settings, backup/rollback behavior and unavailable-service safeguards.
 
-## v2.1.64 — Retire orphaned faceplate preview backend (Local)
+## v2.1.64 — Retire orphaned faceplate preview backend
 
 - Remove the no-longer-used Installer `/api/faceplate-preview` endpoint, its generated image cache, and preview-only SHA field after the faceplate review UI was removed in 2.1.63.
 - Preserve the general diagnostic `/api/dry-run`, its verified change summary, SHA-based stock artwork history, managed-file preservation, backups and normal component update behavior. Faceplate upgrade approval remains exclusive to Discovery Hub.
 - Add negative regression coverage for retired preview generation and serving without weakening stock SHA protection.
 
-## v2.1.63 — Normal Core updates; faceplates belong to Hub (Local)
+## v2.1.63 — Normal Core updates; faceplates belong to Hub
 
 - Remove the Faceplate Upgrade Review section, image previews, artwork acceptance buttons, pulsing Hub shortcut, special dry-run decisions and related Installer CSS/JavaScript. Core Update and Update All now start their standard installation operations directly, as with other components.
 - Following the normal Core update and Home Assistant Core restart, Discovery Hub alone discovers and offers newer verified Native stock faceplates. Installer does not approve or reset faceplate selections.
 - Preserve exact-source Core install integrity, managed-file preservation, backup and rollback safeguards and the normal restart guidance. Dedicated regressions verify normal component routing and absence of the removed UI.
 
-## v2.1.62 — Finish Core updates when stock artwork is unchanged (Local)
+## v2.1.62 — Finish Core updates when stock artwork is unchanged
 
 - Fix a no-op Core Update experience: the faceplate SHA preflight completed but showed no approval actions when stock PNG and factory geometry were unchanged (for example Core 2.7.98 → 2.7.99).
 - After a successful preflight with complete empty artwork changes, passing checks and managed files to update, automatically start the already-requested Core installation. Core/Update All still require explicit artwork choice when a real faceplate difference exists.
 - Fail closed when artwork comparison, change plan or required checks are incomplete; never mistake missing comparison data for "no changes". Preserve saved artwork choices and Calibration, read-only preflight, and the explicit review path for changed stock artwork.
 - Add permanent independent regressions for no-change Core auto-continue, changed-artwork manual approval, malformed comparison, failed preflight, already-current and one-time update dispatch.
 
-## v2.1.61 — Correct faceplate preview revisions and direct Hub navigation (Local)
+## v2.1.61 — Correct faceplate preview revisions and direct Hub navigation
 
 - Use verified previous and incoming SHA-256 values to version the Installer's preflight and post-update artwork image URLs, preventing same-filename stock faceplates from displaying the cached outgoing image twice.
 - Rename the review action **Open Switch Vision Hub** and target Home Assistant's installed Discovery app route, not its settings page or an expired Supervisor ingress token.
 - Apply centred large amber/emerald soft-neon headings to the full-width artwork comparisons, and centre a cyan-outline **Open Switch Vision Hub** button with gentle border pulse (disabled for reduced-motion users); neither heading resembles a destructive/reset action.
 - Retain the preservation controls, explicit per-switch Hub approval and saved Calibration safety, with permanent regression coverage.
 
-## v2.1.60 — Dedicated faceplate review and readable Core preflight (Local)
+## v2.1.60 — Dedicated faceplate review and readable Core preflight
 
 - Move verified SHA artwork comparison into its own responsive section above Activity, with current/new images stacked at full available width.
 - Present current-artwork Core update in an accessible orange gradient, and update-then-review in a green gradient; neither action changes a switch's saved Calibration or approves artwork automatically.
@@ -38,35 +43,35 @@
 - Replace direct Supervisor ingress URLs that can return 404 in a new tab with Home Assistant's Discovery app navigation. Show the Hub review option after a successful installation, and retain explicit per-switch Hub approval.
 - Preserve read-only dry runs, explicit Core install initiation, verified original-and-geometry history, restart guidance and cancellation safeguards.
 
-## v2.1.59 — SHA-paired stock preflight and local review (Local)
+## v2.1.59 — SHA-paired stock preflight and local review
 
 - Compare installed and incoming stock PNG plus one canonical factory geometry by actual SHA-256 during Core upgrade preparation; never archive unchanged pairs.
 - Keep previous verified image/geometry together in local SHA-identified history and preserve actively selected revisions across skipped upgrades.
 - Surface new dedicated stock artwork candidates and changed pairs in the Installer review card, retaining per-switch approval in Discovery Hub and leaving user Calibration untouched.
 
-## v2.1.58 — Selected-old faceplate/geometry retention (Local)
+## v2.1.58 — Selected-old faceplate/geometry retention
 
 - Preserve only selected, digest-verified image-and-factory-geometry revisions that leave Core's capped bundle, inside the existing managed history area.
 - Stop replacement if a pinned pair is missing/corrupt, and avoid copying unchanged stock PNGs into history on routine releases.
 - Keep per-switch choices and Calibration storage untouched, with no component upgrade ordering requirement.
 
-## v2.1.57 — Bundled Core artwork revisions (Local)
+## v2.1.57 — Bundled Core artwork revisions
 
 - Install the Core-shipped `faceplates-old` image/factory-geometry archive and manifest without requiring component updates in a fixed order.
 - Preserve normal Core installation, verified backups, personal assets and existing legacy-history compatibility.
 
-## v2.1.56 — Pre-upgrade artwork capture (Local)
+## v2.1.56 — Pre-upgrade artwork capture
 
 - Before replacing any Core files, record existing configured switch identities with exact verified outgoing/incoming stock image SHA-256 pairs in a private config file.
 - Keep archived PNG bytes in the existing holding directory; never persist credentials, reset Calibration or override a prior explicit selection.
 
-## v2.1.55 — Verified stock faceplate holding catalog (Local)
+## v2.1.55 — Verified stock faceplate holding catalog
 
 - Before replacing Core's stock images, preserve all manifest-verified outgoing faceplate PNGs in a content-addressed holding directory, including unchanged files.
 - Keep stable canonical stock filenames and deduplicate retained image bytes across versions; fail safely on untrusted/tampered assets or excessive retained inventory.
 - Enable old/new per-switch approval without automatically changing saved Calibration.
 
-## v2.1.54 — Retain prior stock faceplates across Core updates (Local)
+## v2.1.54 — Retain prior stock faceplates across Core updates
 
 - Before atomic Core frontend replacement, verify installed and incoming stock PNG hashes against their respective packaged manifests and retain the replaced image under a separate content-addressed artwork history.
 - Preserve the first verified original for pre-fingerprint Calibration profiles and carry prior history forward in later installations, without changing model filenames, factory geometry, custom art or existing backup/rollback protections.
