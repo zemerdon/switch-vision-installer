@@ -1,3 +1,7 @@
+## v2.1.72 — Simplify verified faceplate preflight
+
+- Remove a duplicate incoming Geometry check without changing the checksum verification, historical artwork preservation or rollback safeguards.
+
 ## v2.1.71 — Recover verified stock faceplate updates
 
 - Recover a partial Core installation only when an existing stock image exactly matches the independently verified incoming image, while retaining the strict refusal for unknown or altered stock artwork.

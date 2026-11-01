@@ -364,8 +364,6 @@ def compare_sha_pairs(release_root: Path, installed_component: Path,
             raise RuntimeError(f"Cannot verify installed stock faceplate: {name}")
         if after and not _verified_image(new_png, after):
             raise RuntimeError(f"Cannot verify incoming stock faceplate: {name}")
-        if after and not new_geos:
-            raise RuntimeError(f"Incoming stock faceplate lacks factory geometry: {name}")
         for geo_file, (old_sha, _) in sorted(old_geos.items()):
             incoming_geo = new_geos.get(geo_file)
             if not incoming_geo:
