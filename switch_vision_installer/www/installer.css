@@ -58,6 +58,16 @@ a{color:var(--link)}a:hover{color:var(--link-hover)}
 .changelog-content code{background:var(--status-bg);border-radius:5px;padding:2px 5px;font-size:.8rem}
 .changelog-content pre{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--surface-inset);border-radius:7px;padding:9px}
 .changelog-content a{color:var(--link)}
+.changelog-version-block{padding:10px 0 12px;border-bottom:1px solid var(--line-soft)}
+.changelog-version-block:last-child{border-bottom:0}
+.changelog-version-block h3{margin:3px 0 8px}
+.changelog-version-block h3 small{font-size:.75em;font-weight:400;color:var(--muted)}
+.changelog-entry-version{display:inline-block;margin-right:8px;color:var(--muted);font-size:.84em;white-space:nowrap}
+.changelog-more{margin:6px 0 0}
+.changelog-more summary{display:list-item;width:fit-content;cursor:pointer;color:var(--link);font-weight:600;padding:5px 2px}
+.changelog-more summary:hover{color:var(--link-hover)}
+.changelog-more summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.changelog-more:not([open]) .changelog-show-less,.changelog-more[open] .changelog-show-more{display:none}
 .card{margin-top:11px}
 .collapsible-card{padding:0;overflow:hidden}
 .collapsible-card>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 14px;cursor:pointer;list-style:none;user-select:none}

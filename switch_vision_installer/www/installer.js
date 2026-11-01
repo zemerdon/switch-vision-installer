@@ -42,7 +42,7 @@ function openActivitySection(){const section=$('activity-section');if(!section)r
 function restoreActivitySection(){const section=$('activity-section');if(!section||activityRestoreState===null)return;if(!activityRestoreState&&section.open){section.dataset.transientToggle='true';section.open=false;}activityRestoreState=null;}
 async function json(url,options){const r=await fetch(url,options),raw=await r.text();let d={};if(raw){try{d=JSON.parse(raw);}catch{throw new Error(`Expected JSON but received ${r.headers.get('content-type')||'an unknown response type'} (HTTP ${r.status}).`);}}if(!r.ok)throw new Error(d.error||`HTTP ${r.status}`);return d;}
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function renderReleaseMarkdown(raw){
+function renderReleaseMarkdownPlain(raw){
   const lines=String(raw||'').replace(/\r\n?/g,'\n').split('\n');
   const out=[];let inList=false,inCode=false,code=[];
   const inline=value=>esc(value).replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>').replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g,'<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
@@ -65,6 +65,56 @@ function renderReleaseMarkdown(raw){
   closeList();
   if(inCode)out.push(`<pre><code>${esc(code.join('\n'))}</code></pre>`);
   return out.join('')||'<p>No changelog was published for this release.</p>';
+}
+function parseChangelogRollups(raw){
+  const lines=String(raw||'').replace(/\r\n?/g,'\n').split('\n');
+  const sections=[];let current=null,inCode=false;
+  for(const line of lines){
+    if(line.trim().startsWith('```')){inCode=!inCode;if(current)current.lines.push(line);continue;}
+    const heading=!inCode&&line.match(/^#{1,3}\s+(.+)$/);
+    if(heading){
+      const match=heading[1].match(/^(?:(?:Previous release:\s*)?Switch Vision Core\s+)?v?(\d+)\.(\d+)\.(\d+)\b/i);
+      current=match?{version:match.slice(1,4).join('.'),major:Number(match[1]),minor:Number(match[2]),lines:[]}:null;
+      if(current)sections.push(current);
+      continue;
+    }
+    if(current)current.lines.push(line);
+  }
+  if(!sections.length)return null;
+  const byKey=new Map();
+  for(const section of sections){
+    const key=section.major<2?`${section.major}.x`:`${section.major}.${section.minor}.x`;
+    if(!byKey.has(key))byKey.set(key,{key,versions:new Set(),bullets:[],seen:new Set()});
+    const group=byKey.get(key);
+    group.versions.add(section.version);
+    for(const line of section.lines){
+      const match=line.match(/^\s*[-*+]\s+(.+)$/);
+      if(!match)continue;
+      const text=match[1].trim();
+      const identity=section.version+'\x00'+text;
+      if(!text||group.seen.has(identity))continue;
+      group.seen.add(identity);
+      group.bullets.push({version:section.version,text});
+    }
+  }
+  return [...byKey.values()].filter(group=>group.bullets.length);
+}
+function renderReleaseMarkdown(raw){
+  const groups=parseChangelogRollups(raw);
+  if(!groups)return renderReleaseMarkdownPlain(raw);
+  const inline=value=>esc(value)
+    .replace(/`([^`]+)`/g,'<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g,'<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  const bullet=item=>`<li><span class="changelog-entry-version">v${esc(item.version)}</span>${inline(item.text)}</li>`;
+  return groups.map(group=>{
+    const visible=group.bullets.slice(0,5),extra=group.bullets.slice(5);
+    const count=group.versions.size;
+    const heading=`<h3>v${esc(group.key)} <small>${count} ${count===1?'release':'releases'}</small></h3>`;
+    const more=extra.length?
+      `<details class="changelog-more"><summary><span class="changelog-show-more">More (${extra.length})</span><span class="changelog-show-less">Less</span></summary><ul>${extra.map(bullet).join('')}</ul></details>`:'';
+    return `<section class="changelog-version-block">${heading}<ul>${visible.map(bullet).join('')}</ul>${more}</section>`;
+  }).join('');
 }
 function toggleChangelog(show){
   const card=$('changelog-card');

@@ -12,6 +12,8 @@ Installer v2.1.14 introduces one lifecycle surface for the complete Switch Visio
 
 Each component exposes its installed version, latest repository version, current state, an always-visible Changelog button, and an Install/Update action when applicable.
 
+Changelog history is grouped into verified **0.x** and **1.x** major blocks, then **one block per minor line from 2.0.x onward**. Each version block initially shows five release bullets with original patch-version labels; **More** expands additional bullets and **Less** collapses them. Original historical detail remains available.
+
 `Update All` uses dependency order: Core → Discovery → SNMP2MQTT → UniFi2MQTT. Optional UniFi2MQTT is never installed implicitly. The Installer remains visible in the manager, but Home Assistant Settings → Apps performs the Installer app update because the running app must not replace itself.
 
 ## Dependency health

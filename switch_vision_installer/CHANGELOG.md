@@ -1,3 +1,9 @@
+## v2.1.73 — Consolidated component changelog history
+
+- Group each maintained component's verified 0.x and 1.x history into major-version blocks, then group 2.0.x and later patches into their corresponding minor-version blocks without losing individual release attribution.
+- Display five changelog bullets per block initially, with keyboard-accessible More and Less controls to reveal or hide additional entries. Apply the same presentation to Core, Discovery/Hub, Installer, SNMP2MQTT and UniFi2MQTT.
+- Preserve the existing update, rollback, Calibration and component-version workflows; this patch changes customer-facing changelog presentation only.
+
 ## v2.1.72 — Simplify verified faceplate preflight
 
 - Remove a duplicate incoming Geometry check without changing the checksum verification, historical artwork preservation or rollback safeguards.
