@@ -1,3 +1,8 @@
+## v2.1.71 — Recover verified stock faceplate updates
+
+- Recover a partial Core installation only when an existing stock image exactly matches the independently verified incoming image, while retaining the strict refusal for unknown or altered stock artwork.
+- Continue preserving verified owner-selected faceplate revisions and their geometry through Core upgrades.
+
 ## v2.1.70 — Clear customer-facing component history
 
 - Remove internal development-stage labels from earlier changelog headings while retaining each version's functional release history.

@@ -351,7 +351,16 @@ def compare_sha_pairs(release_root: Path, installed_component: Path,
         new_geos = after_geometries.get(name, {})
         old_png = installed_frontend / "faceplates" / name
         new_png = release_root / "faceplates" / name
+        if after and not new_geos:
+            raise RuntimeError(f"Incoming stock faceplate lacks factory geometry: {name}")
         if not _verified_image(old_png, before):
+            # An earlier interrupted/rolled-back Core update may have left
+            # the *incoming verified* PNG in place while retaining the old
+            # component manifest. That mixed pair cannot become history.
+            # Accept only bytes that exactly match the independently verified
+            # incoming stock image; all other drift stays blocked.
+            if after and _verified_image(old_png, after) and _verified_image(new_png, after):
+                continue
             raise RuntimeError(f"Cannot verify installed stock faceplate: {name}")
         if after and not _verified_image(new_png, after):
             raise RuntimeError(f"Cannot verify incoming stock faceplate: {name}")

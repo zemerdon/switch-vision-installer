@@ -125,6 +125,31 @@ class SHAHistoryTests(unittest.TestCase):
             self.assertEqual(preserve_sha_pairs(new, component, old, stage), [])
             self.assertFalse((stage / "faceplate-history").exists())
 
+    def test_installed_png_already_matches_verified_incoming_after_interrupted_update(self):
+        with TemporaryDirectory() as td:
+            b = Path(td)
+            old, new, stage = (b / name for name in ("old", "new", "stage"))
+            component = release(old, b"compact-old", 10)
+            release(new, b"original-new", 20)
+            # Known failure: retained Core 2.8.29 manifest expects old
+            # compact art but an interrupted upgrade left the new image bytes.
+            (old / "faceplates/example.png").write_bytes(b"original-new")
+            self.assertEqual(compare_sha_pairs(new, component, old), [])
+            self.assertEqual(preserve_sha_pairs(new, component, old, stage), [])
+            self.assertEqual(faceplate_change_summary(new, component, old)["changed"], [])
+            self.assertFalse((stage / "faceplate-history").exists())
+
+            # Allowing exact incoming bytes never permits unknown/mutated art.
+            (old / "faceplates/example.png").write_bytes(b"unknown pixels")
+            with self.assertRaisesRegex(RuntimeError, "Cannot verify installed stock"):
+                compare_sha_pairs(new, component, old)
+
+            # Nor may an unverified incoming image mask a mixed previous install.
+            (old / "faceplates/example.png").write_bytes(b"original-new")
+            (new / "faceplates/example.png").write_bytes(b"tampered incoming")
+            with self.assertRaisesRegex(RuntimeError, "Cannot verify installed stock"):
+                compare_sha_pairs(new, component, old)
+
     def test_tamper_blocks_pair_preservation(self):
         with TemporaryDirectory() as td:
             b = Path(td)
