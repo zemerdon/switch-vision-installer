@@ -1,3 +1,8 @@
+## v2.1.74 — Installer documentation alignment
+
+- Clarify the locally reviewed release provenance versus public download channels, while preserving the one-repository customer installation path.
+- Make version identity and safe Supervisor retry guidance explicit; older README version notes remain historical rather than current operational instructions.
+
 ## v2.1.73 — Consolidated component changelog history
 
 - Group each maintained component's verified 0.x and 1.x history into major-version blocks, then group 2.0.x and later patches into their corresponding minor-version blocks without losing individual release attribution.
