@@ -1,3 +1,8 @@
+## v2.1.75 — Start Installer after Home Assistant reboots
+
+- Start the Installer management app automatically after a Home Assistant restart, so the existing component-management UI and version/status checks are available without manually starting the app.
+- Keep component installs and updates explicitly user-initiated; startup still performs only the existing interrupted-install recovery before serving the UI.
+
 ## v2.1.74 — Installer documentation alignment
 
 - Clarify the locally reviewed release provenance versus public download channels, while preserving the one-repository customer installation path.
